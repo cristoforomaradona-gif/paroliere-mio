@@ -634,6 +634,9 @@
                 setRole('guest', document.getElementById('guestRoleBtn'));
                 document.getElementById('roomCodeInput').value = roomParam.toUpperCase();
             }
+
+            // CONTROLLO RIPRISTINO AUTOMATICO DA RICARICA
+            loadFromLocalStorage();
         });
 
         document.getElementById('wordInput').addEventListener('keypress', function(e) {
@@ -788,11 +791,10 @@
                 document.getElementById('setupPanel').style.display = 'none';
                 document.getElementById('gameArea').style.display = 'flex';
                 document.getElementById('digitalNotepad').style.display = 'none';
-                
-                // Mostra il tasto ruota SOLO in modalità single device
                 document.getElementById('rotateBtn').style.display = 'inline-block';
                 document.getElementById('hostPauseBtn').style.display = 'inline-block';
                 
+                saveToLocalStorage('game');
                 startTableRound();
             } else {
                 myName = document.getElementById('playerNameInput').value.trim() || "Giocatore";
@@ -818,6 +820,7 @@
                 document.getElementById('codeDisplay').textContent = roomCode;
 
                 if (!leaderboard[myName]) leaderboard[myName] = 0;
+                saveToLocalStorage('lobby');
             }
         }
 
@@ -855,8 +858,6 @@
             document.getElementById('lobbyPanel').style.display = 'none';
             document.getElementById('gameArea').style.display = 'flex';
             document.getElementById('digitalNotepad').style.display = 'block';
-
-            // Nascondi il tasto ruota nella modalità multi-telefono
             document.getElementById('rotateBtn').style.display = 'none';
 
             if (role === 'host') {
@@ -865,6 +866,7 @@
                 document.getElementById('hostPauseBtn').style.display = 'none';
             }
 
+            saveToLocalStorage('game');
             startRound();
         }
 
@@ -949,6 +951,7 @@
                     triggerVibration(40);
                     playAudioTone(800, 0.08);
                     renderWordList();
+                    saveToLocalStorage('game');
                 }
             }
             input.value = '';
@@ -1101,6 +1104,7 @@
             });
 
             document.getElementById('leaderboardModal').style.display = 'flex';
+            saveToLocalStorage('leaderboard');
         }
 
         function returnToLobbyNextRound() {
@@ -1110,14 +1114,84 @@
             if (deviceMode === 'single') {
                 roomCode = generateSeedCode();
                 document.getElementById('gameArea').style.display = 'flex';
+                saveToLocalStorage('game');
                 startTableRound();
             } else {
                 document.getElementById('lobbyPanel').style.display = 'block';
+                saveToLocalStorage('lobby');
             }
         }
 
         function resetAll() {
+            localStorage.removeItem('paroliere_state');
             location.href = window.location.pathname;
+        }
+
+        // --- GESTIONE LOCALSTORAGE (ANTI-RICARICA ACCIDENTALE) ---
+        function saveToLocalStorage(step) {
+            const state = {
+                step: step,
+                deviceMode: deviceMode,
+                role: role,
+                config: config,
+                myName: myName,
+                roomCode: roomCode,
+                myWords: myWords,
+                leaderboard: leaderboard
+            };
+            localStorage.setItem('paroliere_state', JSON.stringify(state));
+        }
+
+        function loadFromLocalStorage() {
+            const saved = localStorage.getItem('paroliere_state');
+            if (!saved) return;
+
+            try {
+                const state = JSON.parse(saved);
+                if (!state.roomCode) return;
+
+                deviceMode = state.deviceMode || 'multi';
+                role = state.role || 'host';
+                config = state.config || config;
+                myName = state.myName || 'Giocatore';
+                roomCode = state.roomCode || '';
+                myWords = state.myWords || [];
+                leaderboard = state.leaderboard || {};
+
+                if (state.step === 'lobby') {
+                    document.getElementById('setupPanel').style.display = 'none';
+                    document.getElementById('lobbyPanel').style.display = 'block';
+                    document.getElementById('codeDisplay').textContent = roomCode;
+                    if (role === 'host') {
+                        document.getElementById('hostLobbyNotice').style.display = 'block';
+                        document.getElementById('startMatchBtn').style.display = 'block';
+                    } else {
+                        document.getElementById('guestLobbyNotice').style.display = 'block';
+                        document.getElementById('guestReadyBtn').style.display = 'block';
+                    }
+                } else if (state.step === 'game') {
+                    document.getElementById('setupPanel').style.display = 'none';
+                    document.getElementById('gameArea').style.display = 'flex';
+                    
+                    if (deviceMode === 'single') {
+                        document.getElementById('digitalNotepad').style.display = 'none';
+                        document.getElementById('rotateBtn').style.display = 'inline-block';
+                        document.getElementById('hostPauseBtn').style.display = 'inline-block';
+                    } else {
+                        document.getElementById('digitalNotepad').style.display = 'block';
+                        document.getElementById('rotateBtn').style.display = 'none';
+                        if (role === 'host') document.getElementById('hostPauseBtn').style.display = 'inline-block';
+                    }
+
+                    renderWordList();
+                    generateGridFromSeed();
+                    // Ripristina un timer di sicurezza a 30 secondi in caso di ricarica inattesa
+                    timeLeft = 30; 
+                    startTimer();
+                }
+            } catch (e) {
+                console.error("Errore ripristino stato", e);
+            }
         }
     </script>
 </body>
