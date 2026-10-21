@@ -1,0 +1,1124 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Il Paroliere Multiplayer</title>
+    <style>
+        :root {
+            --bg-color: #121213;
+            --surface-color: #1a1a1b;
+            --panel-color: #212124;
+            --text-main: #ffffff;
+            --text-muted: #818384;
+            --accent: #538d4e;
+            --accent-hover: #6aaa64;
+            --warning: #b59f3b;
+            --danger: #e74c3c;
+            --border: #3a3a3c;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            min-height: -webkit-fill-available;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px;
+            overflow-x: hidden;
+        }
+
+        html { height: -webkit-fill-available; }
+
+        header {
+            text-align: center;
+            margin-bottom: 8px;
+        }
+
+        h1 {
+            font-size: 1.4rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .subtitle {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .main-container {
+            width: 100%;
+            max-width: 420px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex: 1;
+        }
+
+        .panel {
+            background-color: var(--surface-color);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .control-group label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-weight: bold;
+        }
+
+        .options-row {
+            display: flex;
+            gap: 6px;
+        }
+
+        .option-btn {
+            flex: 1;
+            padding: 10px 4px;
+            background-color: var(--panel-color);
+            border: 2px solid var(--border);
+            color: var(--text-main);
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            cursor: pointer;
+            touch-action: manipulation;
+            text-align: center;
+        }
+
+        .option-btn.active {
+            border-color: var(--accent);
+            background-color: rgba(83, 141, 78, 0.15);
+        }
+
+        .input-text {
+            width: 100%;
+            padding: 12px;
+            background-color: var(--panel-color);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-main);
+            font-size: 1rem;
+            text-transform: uppercase;
+            outline: none;
+            touch-action: manipulation;
+        }
+
+        .time-inputs {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .time-inputs input {
+            text-align: center;
+            font-size: 1.1rem;
+            font-weight: bold;
+        }
+
+        .btn-primary {
+            width: 100%;
+            padding: 14px;
+            background-color: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+
+        .btn-primary:active { background-color: var(--accent-hover); }
+
+        .btn-secondary {
+            width: 100%;
+            padding: 12px;
+            background-color: var(--panel-color);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+
+        .toast-banner {
+            position: fixed;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-100px);
+            background-color: var(--danger);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            z-index: 1000;
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            pointer-events: none;
+        }
+
+        .toast-banner.show {
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .lobby-panel { text-align: center; display: none; }
+        .code-box {
+            font-size: 2rem;
+            font-weight: 900;
+            letter-spacing: 4px;
+            color: var(--accent);
+            background: var(--panel-color);
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            margin: 8px 0;
+        }
+
+        .game-area {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            display: none;
+        }
+
+        .hud {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .timer-display {
+            font-size: 1.6rem;
+            font-weight: 900;
+            color: var(--accent);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .hud-tools {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .tool-btn {
+            background: var(--panel-color);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+
+        .tool-btn.off { opacity: 0.4; }
+
+        .grid-wrapper {
+            position: relative;
+            padding: 8px;
+            background: var(--surface-color);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+            width: 100%;
+            transition: transform 0.4s ease;
+        }
+
+        .lid {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, #2a2a2d 0%, #151517 100%);
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            transition: transform 0.8s cubic-bezier(0.77, 0, 0.175, 1), opacity 0.5s ease;
+        }
+
+        .lid.open {
+            transform: translateY(-110%) rotateX(45deg);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .lid.shaking { animation: shake 0.1s infinite; }
+
+        @keyframes shake {
+            0% { transform: translate(1px, 1px); }
+            50% { transform: translate(-2px, -1px); }
+            100% { transform: translate(1px, 2px); }
+        }
+
+        .pause-overlay {
+            position: absolute;
+            inset: 0;
+            background-color: #121213;
+            opacity: 1;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+            display: none;
+        }
+
+        .grid { display: grid; gap: 6px; }
+        .grid-5 { grid-template-columns: repeat(5, 1fr); }
+        .grid-6 { grid-template-columns: repeat(6, 1fr); }
+
+        .dice {
+            aspect-ratio: 1;
+            background-color: #2c2c2e;
+            border: 2px solid #3a3a3c;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+            font-weight: 900;
+        }
+
+        .mini-dice {
+            font-size: 0.85rem !important;
+            border-width: 1px !important;
+            border-radius: 4px !important;
+        }
+
+        .word-input-container {
+            width: 100%;
+            display: flex;
+            gap: 6px;
+            margin-top: 10px;
+        }
+
+        .word-list {
+            width: 100%;
+            max-height: 140px;
+            overflow-y: auto;
+            background: var(--surface-color);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-top: 8px;
+            padding: 8px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .word-badge {
+            background: var(--panel-color);
+            border: 1px solid var(--border);
+            padding: 6px 10px;
+            border-radius: 14px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            touch-action: manipulation;
+        }
+
+        .word-badge.deleted { text-decoration: line-through; opacity: 0.4; }
+        .word-badge.half { border-color: var(--warning); color: var(--warning); }
+
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.92);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            padding: 12px;
+            display: none;
+        }
+
+        .modal-card {
+            background: var(--surface-color);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 16px;
+            max-width: 380px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .modal-card h2 { text-align: center; margin-bottom: 5px; color: var(--accent); }
+
+        .leaderboard-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+
+        .leaderboard-table th, .leaderboard-table td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.9rem;
+        }
+
+        .leaderboard-table th { color: var(--text-muted); }
+
+        .manual-score-input {
+            width: 60px;
+            padding: 6px;
+            background: var(--panel-color);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-main);
+            text-align: center;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="toastBanner" class="toast-banner">⚠️ Parola già inserita!</div>
+
+    <header>
+        <h1>Il Paroliere</h1>
+        <div class="subtitle">Multiplayer Mobile da Tavolo</div>
+    </header>
+
+    <div class="main-container">
+        <!-- CONFIGURAZIONE INIZIALE -->
+        <div id="setupPanel" class="panel">
+            <div class="control-group">
+                <label>Modalità Gioco</label>
+                <div class="options-row">
+                    <button class="option-btn active" onclick="setDeviceMode('multi', this)">📱 Ognuno col suo Cell</button>
+                    <button class="option-btn" onclick="setDeviceMode('single', this)">🎲 Unico Tel + Carta</button>
+                </div>
+            </div>
+
+            <div id="singlePlayersGroup" class="control-group" style="display:none;">
+                <label>Nomi Giocatori (Separati da virgola)</label>
+                <input type="text" id="playersListInput" class="input-text" placeholder="Es. Marco, Anna, Luca" value="Giocatore 1, Giocatore 2">
+            </div>
+
+            <div id="playerNameGroup" class="control-group">
+                <label>Il tuo Nome</label>
+                <input type="text" id="playerNameInput" class="input-text" placeholder="Es. Marco">
+            </div>
+
+            <div id="roleGroup" class="control-group">
+                <label>Ruolo Giocatore</label>
+                <div class="options-row">
+                    <button class="option-btn active" onclick="setRole('host', this)">Crea Stanza (Host)</button>
+                    <button class="option-btn" id="guestRoleBtn" onclick="setRole('guest', this)">Entra con Codice</button>
+                </div>
+            </div>
+
+            <div id="hostControls">
+                <div class="control-group" style="margin-bottom: 8px;">
+                    <label>Dimensione Griglia</label>
+                    <div class="options-row">
+                        <button class="option-btn active" onclick="setGridSize(5, this)">5 x 5</button>
+                        <button class="option-btn" onclick="setGridSize(6, this)">6 x 6</button>
+                    </div>
+                </div>
+
+                <div id="scoringGroup" class="control-group" style="margin-bottom: 8px;">
+                    <label>Calcolo Punteggi</label>
+                    <div class="options-row">
+                        <button class="option-btn active" onclick="setScoringMode('classic', this)">Classico</button>
+                        <button class="option-btn" onclick="setScoringMode('perLetter', this)">1 Ptn/Lettera</button>
+                        <button class="option-btn" onclick="setScoringMode('perWord', this)">1 Ptn/Parola</button>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Durata Partita (Minuti : Secondi)</label>
+                    <div class="time-inputs">
+                        <input type="number" id="customMin" class="input-text" value="3" min="0" max="10">
+                        <span style="font-size:1.2rem; font-weight:bold;">:</span>
+                        <input type="number" id="customSec" class="input-text" value="00" min="0" max="59">
+                    </div>
+                </div>
+            </div>
+
+            <div id="guestControls" style="display: none;">
+                <div class="control-group">
+                    <label>Codice Stanza dell'Host</label>
+                    <input type="text" id="roomCodeInput" class="input-text" placeholder="Es. B4K9">
+                </div>
+            </div>
+
+            <button class="btn-primary" onclick="initLobby()">INIZIA PARTITA</button>
+        </div>
+
+        <!-- STANZA D'ATTESA (LOBBY) -->
+        <div id="lobbyPanel" class="panel lobby-panel">
+            <h2>Stanza Pronta</h2>
+            <p style="font-size:0.8rem; color: var(--text-muted);">Codice Stanza per gli amici:</p>
+            <div id="codeDisplay" class="code-box">----</div>
+
+            <button class="btn-secondary" style="margin-bottom: 12px;" onclick="shareRoomLink()">📲 Condividi Link Stanza</button>
+
+            <div id="hostLobbyNotice" style="display:none; font-size:0.85rem; color:var(--text-muted); margin-bottom:10px;">
+                Quando tutti sono pronti, premi il pulsante per far partire la sfida!
+            </div>
+
+            <div id="guestLobbyNotice" style="display:none; font-size:0.85rem; color:var(--text-muted); margin-bottom:10px;">
+                In attesa che l'Host dia il via alla partita...
+            </div>
+
+            <button id="startMatchBtn" class="btn-primary" onclick="startCountdownAndPlay()" style="display:none;">AVVIA PARTITA PER TUTTI 🚀</button>
+            <button id="guestReadyBtn" class="btn-primary" onclick="startCountdownAndPlay()" style="display:none;">SONO PRONTO (AVVIA TIMER)</button>
+        </div>
+
+        <!-- AREA GIOCO -->
+        <div id="gameArea" class="game-area">
+            <div class="hud">
+                <div id="timerDisplay" class="timer-display">03:00</div>
+                <div class="hud-tools">
+                    <button class="tool-btn" id="rotateBtn" style="display:none;" onclick="rotateGrid()">🔄 Ruota</button>
+                    <button class="tool-btn" id="toggleSoundBtn" onclick="toggleAudio()">🔔</button>
+                    <button class="tool-btn" id="toggleVibeBtn" onclick="toggleVibrationSetting()">📳</button>
+                    <button class="tool-btn" id="hostPauseBtn" onclick="togglePause()">⏸️</button>
+                </div>
+            </div>
+
+            <div id="gridWrapper" class="grid-wrapper">
+                <div id="lid" class="lid" style="display:none;">
+                    <div style="text-align:center;">
+                        <div id="lidTitle" style="font-weight:bold; font-size:1rem; margin-bottom:5px;">Mescolando i dadi...</div>
+                        <div id="countdownNum" style="font-size:3rem; font-weight:900; color:var(--accent);">3</div>
+                    </div>
+                </div>
+
+                <div id="pauseOverlay" class="pause-overlay">
+                    <h3 style="margin-bottom:10px; color: var(--text-main);">PARTITA IN PAUSA</h3>
+                    <button class="btn-primary" style="width:auto; padding: 10px 20px;" onclick="togglePause()">RIPRENDI</button>
+                </div>
+                <div id="diceGrid" class="grid grid-5"></div>
+            </div>
+
+            <div id="digitalNotepad" style="width: 100%;">
+                <div class="word-input-container">
+                    <input type="text" id="wordInput" class="input-text" placeholder="Scrivi parola..." autocomplete="off" capitalize="characters">
+                    <button class="btn-primary" style="width: auto; padding: 0 16px;" onclick="addWord()">+ Add</button>
+                </div>
+
+                <div id="wordList" class="word-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODALE FASE REVISIONE -->
+    <div id="reviewModal" class="modal">
+        <div class="modal-card">
+            <h2>Tempo Scaduto!</h2>
+            <p id="reviewSubtitle" style="font-size:0.75rem; color: var(--text-muted); text-align:center; margin-bottom:8px;">
+                Verifica le parole sulla griglia.<br>
+                1 Tap = <b>Mezzo Punteggio</b> | 2 Tap = <b>Annullata</b>
+            </p>
+
+            <div class="grid-wrapper" style="padding: 6px; margin-bottom: 8px;">
+                <div id="reviewDiceGrid" class="grid grid-5"></div>
+            </div>
+
+            <div id="multiReviewSection">
+                <div id="reviewWordList" class="word-list" style="max-height: 140px; margin-bottom: 8px;"></div>
+                <div style="text-align: center; margin-bottom: 12px; font-size:0.95rem;">
+                    Punti Round: <b id="roundScoreDisplay" style="color:var(--accent); font-size:1.1rem;">0</b>
+                </div>
+                <button class="btn-primary" onclick="confirmRoundScore()">CONFERMA E CLASSIFICA</button>
+            </div>
+
+            <div id="singleReviewSection" style="display:none;">
+                <p style="font-size:0.8rem; text-align:center; color:var(--text-muted); margin-bottom:8px;">Inserisci i punti fatti in questo round da ciascun giocatore:</p>
+                <table class="leaderboard-table">
+                    <thead>
+                        <tr>
+                            <th>Giocatore</th>
+                            <th style="width: 80px; text-align:center;">Punti Round</th>
+                        </tr>
+                    </thead>
+                    <tbody id="singleScoreInputsBody"></tbody>
+                </table>
+                <button class="btn-primary" onclick="saveSingleRoundScores()">SALVA PUNTI E VEDI CLASSIFICA</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODALE CLASSIFICA -->
+    <div id="leaderboardModal" class="modal">
+        <div class="modal-card">
+            <h2>🏆 Classifica Sessione</h2>
+            
+            <table class="leaderboard-table">
+                <thead>
+                    <tr>
+                        <th>Giocatore</th>
+                        <th>Totale Punti</th>
+                    </tr>
+                </thead>
+                <tbody id="leaderboardBody"></tbody>
+            </table>
+
+            <button class="btn-primary" style="margin-bottom: 8px;" onclick="returnToLobbyNextRound()">PROSSIMO ROUND 🔄</button>
+            <button class="btn-secondary" onclick="resetAll()">Esci dalla Stanza</button>
+        </div>
+    </div>
+
+    <script>
+        const realDiceItalian = [
+            ["A", "A", "E", "I", "O", "T"], ["A", "B", "I", "O", "R", "T"], ["A", "C", "H", "O", "P", "S"],
+            ["A", "E", "F", "H", "U", "P"], ["A", "E", "G", "N", "U", "V"], ["A", "E", "I", "M", "N", "Q"],
+            ["A", "E", "L", "P", "R", "S"], ["A", "F", "I", "R", "S", "U"], ["B", "D", "E", "O", "R", "T"],
+            ["D", "E", "I", "L", "N", "Z"], ["E", "I", "I", "M", "S", "T"], ["E", "I", "L", "O", "S", "U"],
+            ["G", "H", "I", "M", "N", "U"], ["E", "L", "P", "R", "U", "Z"], ["I", "I", "I", "T", "T", "U"],
+            ["C", "I", "I", "M", "O", "U"], ["C", "D", "E", "E", "H", "I"], ["S", "S", "N", "E", "V", "I"],
+            ["R", "T", "T", "O", "A", "E"], ["M", "N", "L", "O", "A", "E"], ["P", "L", "C", "I", "O", "U"],
+            ["V", "B", "F", "A", "E", "O"], ["G", "C", "Q", "I", "O", "A"], ["Z", "S", "T", "I", "E", "A"],
+            ["D", "T", "N", "I", "E", "A"], ["L", "M", "N", "I", "O", "S"], ["R", "S", "T", "L", "E", "A"],
+            ["B", "P", "M", "E", "I", "A"], ["G", "F", "V", "E", "O", "A"], ["H", "Z", "S", "A", "E", "I"],
+            ["Q", "U", "C", "I", "O", "A"], ["C", "S", "T", "I", "O", "A"], ["D", "M", "N", "O", "E", "A"],
+            ["L", "R", "T", "E", "I", "A"], ["P", "F", "V", "I", "O", "A"], ["G", "B", "D", "E", "I", "O"]
+        ];
+
+        let deviceMode = 'multi';
+        let role = 'host';
+        let config = { size: 5, totalSeconds: 180, scoringMode: 'classic' };
+        let settings = { sound: true, vibe: true };
+        let myName = "Giocatore";
+        let roomCode = "";
+        let myWords = [];
+        let leaderboard = {};
+        let timerInterval = null;
+        let timeLeft = 0;
+        let isPaused = false;
+        let currentRotation = 0;
+        let currentLetters = [];
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const roomParam = urlParams.get('room');
+            if (roomParam) {
+                setRole('guest', document.getElementById('guestRoleBtn'));
+                document.getElementById('roomCodeInput').value = roomParam.toUpperCase();
+            }
+        });
+
+        document.getElementById('wordInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') addWord();
+        });
+
+        function setDeviceMode(mode, btn) {
+            deviceMode = mode;
+            btn.parentElement.querySelectorAll('.option-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            if (mode === 'single') {
+                document.getElementById('playerNameGroup').style.display = 'none';
+                document.getElementById('roleGroup').style.display = 'none';
+                document.getElementById('guestControls').style.display = 'none';
+                document.getElementById('hostControls').style.display = 'block';
+                document.getElementById('singlePlayersGroup').style.display = 'flex';
+                document.getElementById('scoringGroup').style.display = 'none';
+            } else {
+                document.getElementById('playerNameGroup').style.display = 'flex';
+                document.getElementById('roleGroup').style.display = 'flex';
+                document.getElementById('singlePlayersGroup').style.display = 'none';
+                document.getElementById('scoringGroup').style.display = 'block';
+                setRole(role, document.querySelector('#roleGroup .option-btn.active'));
+            }
+        }
+
+        function setRole(r, btn) {
+            role = r;
+            btn.parentElement.querySelectorAll('.option-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById('hostControls').style.display = r === 'host' ? 'block' : 'none';
+            document.getElementById('guestControls').style.display = r === 'guest' ? 'block' : 'none';
+        }
+
+        function setGridSize(s, btn) {
+            config.size = s;
+            btn.parentElement.querySelectorAll('.option-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+        }
+
+        function setScoringMode(mode, btn) {
+            config.scoringMode = mode;
+            btn.parentElement.querySelectorAll('.option-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+        }
+
+        function generateSeedCode() {
+            return Math.random().toString(36).substring(2, 6).toUpperCase();
+        }
+
+        function triggerVibration(pattern) {
+            if (settings.vibe && "vibrate" in navigator) {
+                navigator.vibrate(pattern);
+            }
+        }
+
+        function playAudioTone(freq, duration) {
+            if (!settings.sound) return;
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            } catch(e) {}
+        }
+
+        function toggleAudio() {
+            settings.sound = !settings.sound;
+            document.getElementById('toggleSoundBtn').classList.toggle('off', !settings.sound);
+        }
+
+        function toggleVibrationSetting() {
+            settings.vibe = !settings.vibe;
+            document.getElementById('toggleVibeBtn').classList.toggle('off', !settings.vibe);
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toastBanner');
+            toast.textContent = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 1200);
+        }
+
+        function shareRoomLink() {
+            let shareUrl = window.location.href;
+            if (window.location.search) {
+                shareUrl = window.location.href.replace(window.location.search, '');
+            }
+            shareUrl = `${shareUrl.split('?')[0]}?room=${roomCode}`;
+
+            if (navigator.share && window.isSecureContext) {
+                navigator.share({
+                    title: 'Il Paroliere - Unisciti alla Stanza',
+                    text: `Gioca con me al Paroliere! Codice Stanza: ${roomCode}`,
+                    url: shareUrl
+                }).catch(() => copyToClipboard(shareUrl));
+            } else {
+                copyToClipboard(shareUrl);
+            }
+        }
+
+        function copyToClipboard(text) {
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(() => {
+                    showToast("🔗 Link Stanza Copiato!");
+                }).catch(() => fallbackCopyText(text));
+            } else {
+                fallbackCopyText(text);
+            }
+        }
+
+        function fallbackCopyText(text) {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed";
+            textArea.style.left = "-999999px";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                showToast("🔗 Link Stanza Copiato!");
+            } catch (err) {
+                showToast(`Codice Stanza: ${roomCode}`);
+            }
+            document.body.removeChild(textArea);
+        }
+
+        function initLobby() {
+            let min = parseInt(document.getElementById('customMin').value) || 0;
+            let sec = parseInt(document.getElementById('customSec').value) || 0;
+            config.totalSeconds = (min * 60) + sec;
+            if(config.totalSeconds <= 0) config.totalSeconds = 180;
+
+            if (deviceMode === 'single') {
+                roomCode = generateSeedCode();
+                let namesRaw = document.getElementById('playersListInput').value;
+                let parsedNames = namesRaw.split(',').map(n => n.trim()).filter(n => n.length > 0);
+                if (parsedNames.length === 0) parsedNames = ["Giocatore 1", "Giocatore 2"];
+
+                leaderboard = {};
+                parsedNames.forEach(name => leaderboard[name] = 0);
+
+                document.getElementById('setupPanel').style.display = 'none';
+                document.getElementById('gameArea').style.display = 'flex';
+                document.getElementById('digitalNotepad').style.display = 'none';
+                
+                // Mostra il tasto ruota SOLO in modalità single device
+                document.getElementById('rotateBtn').style.display = 'inline-block';
+                document.getElementById('hostPauseBtn').style.display = 'inline-block';
+                
+                startTableRound();
+            } else {
+                myName = document.getElementById('playerNameInput').value.trim() || "Giocatore";
+
+                if (role === 'host') {
+                    roomCode = generateSeedCode();
+                    document.getElementById('hostLobbyNotice').style.display = 'block';
+                    document.getElementById('startMatchBtn').style.display = 'block';
+                    document.getElementById('guestLobbyNotice').style.display = 'none';
+                    document.getElementById('guestReadyBtn').style.display = 'none';
+                } else {
+                    roomCode = document.getElementById('roomCodeInput').value.trim().toUpperCase();
+                    if (!roomCode) { showToast("Inserisci un codice valido!"); return; }
+
+                    document.getElementById('hostLobbyNotice').style.display = 'none';
+                    document.getElementById('startMatchBtn').style.display = 'none';
+                    document.getElementById('guestLobbyNotice').style.display = 'block';
+                    document.getElementById('guestReadyBtn').style.display = 'block';
+                }
+
+                document.getElementById('setupPanel').style.display = 'none';
+                document.getElementById('lobbyPanel').style.display = 'block';
+                document.getElementById('codeDisplay').textContent = roomCode;
+
+                if (!leaderboard[myName]) leaderboard[myName] = 0;
+            }
+        }
+
+        function startTableRound() {
+            let lid = document.getElementById('lid');
+            lid.style.display = 'flex';
+            lid.classList.remove('open');
+            lid.classList.add('shaking');
+            document.getElementById('lidTitle').textContent = "Mescolando i dadi...";
+            document.getElementById('countdownNum').style.display = 'none';
+
+            generateGridFromSeed();
+
+            setTimeout(() => {
+                lid.classList.remove('shaking');
+                document.getElementById('countdownNum').style.display = 'block';
+                document.getElementById('lidTitle').textContent = "La partita inizia tra:";
+                let count = 3;
+                document.getElementById('countdownNum').textContent = count;
+
+                let cInterval = setInterval(() => {
+                    count--;
+                    if (count > 0) {
+                        document.getElementById('countdownNum').textContent = count;
+                    } else {
+                        clearInterval(cInterval);
+                        lid.classList.add('open');
+                        startTimer();
+                    }
+                }, 1000);
+            }, 1200);
+        }
+
+        function startCountdownAndPlay() {
+            document.getElementById('lobbyPanel').style.display = 'none';
+            document.getElementById('gameArea').style.display = 'flex';
+            document.getElementById('digitalNotepad').style.display = 'block';
+
+            // Nascondi il tasto ruota nella modalità multi-telefono
+            document.getElementById('rotateBtn').style.display = 'none';
+
+            if (role === 'host') {
+                document.getElementById('hostPauseBtn').style.display = 'inline-block';
+            } else {
+                document.getElementById('hostPauseBtn').style.display = 'none';
+            }
+
+            startRound();
+        }
+
+        function generateGridFromSeed() {
+            let seed = pseudorandomFromSeed(roomCode);
+            let totalCells = config.size * config.size;
+            let diceGrid = document.getElementById('diceGrid');
+            diceGrid.className = `grid grid-${config.size}`;
+            diceGrid.innerHTML = '';
+
+            let shuffledDice = [...realDiceItalian].sort(() => seed() - 0.5).slice(0, totalCells);
+            currentLetters = shuffledDice.map(die => die[Math.floor(seed() * die.length)]).sort(() => seed() - 0.5);
+
+            for (let i = 0; i < totalCells; i++) {
+                let cell = document.createElement('div');
+                cell.className = 'dice';
+                cell.textContent = currentLetters[i];
+                diceGrid.appendChild(cell);
+            }
+        }
+
+        function startRound() {
+            myWords = [];
+            renderWordList();
+            document.getElementById('wordInput').disabled = false;
+
+            generateGridFromSeed();
+            startTimer();
+        }
+
+        function startTimer() {
+            timeLeft = config.totalSeconds;
+            updateTimerDisplay();
+
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                if (!isPaused) {
+                    timeLeft--;
+                    updateTimerDisplay();
+
+                    if (timeLeft <= 5 && timeLeft > 0) playAudioTone(600, 0.1);
+
+                    if (timeLeft <= 0) {
+                        clearInterval(timerInterval);
+                        endRound();
+                    }
+                }
+            }, 1000);
+        }
+
+        function rotateGrid() {
+            currentRotation = (currentRotation + 90) % 360;
+            document.getElementById('gridWrapper').style.transform = `rotate(${currentRotation}deg)`;
+            document.getElementById('reviewDiceGrid').parentElement.style.transform = `rotate(${currentRotation}deg)`;
+        }
+
+        function pseudorandomFromSeed(str) {
+            let h = 1779502911 ^ str.length;
+            for (let i = 0; i < str.length; i++) {
+                h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+                h = h << 13 | h >>> 19;
+            }
+            return function() {
+                h = Math.imul(h ^ (h >>> 16), 2246822507);
+                h = Math.imul(h ^ (h >>> 13), 3266489909);
+                return (h >>>= 0) / 4294967296;
+            }
+        }
+
+        function addWord() {
+            if (isPaused) return;
+            let input = document.getElementById('wordInput');
+            let w = input.value.trim().toUpperCase();
+
+            if (w.length >= 3) {
+                if (myWords.some(item => item.word === w)) {
+                    showToast("⚠️ Parola già inserita!");
+                    triggerVibration([50, 50, 50]);
+                    playAudioTone(250, 0.15);
+                } else {
+                    myWords.push({ word: w, state: 'full' });
+                    triggerVibration(40);
+                    playAudioTone(800, 0.08);
+                    renderWordList();
+                }
+            }
+            input.value = '';
+        }
+
+        function renderWordList() {
+            let container = document.getElementById('wordList');
+            container.innerHTML = '';
+            myWords.forEach(item => {
+                let badge = document.createElement('div');
+                badge.className = 'word-badge';
+                badge.textContent = item.word;
+                container.appendChild(badge);
+            });
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function updateTimerDisplay() {
+            let min = Math.floor(timeLeft / 60);
+            let sec = timeLeft % 60;
+            document.getElementById('timerDisplay').textContent = 
+                `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+        }
+
+        function togglePause() {
+            if (deviceMode === 'multi' && role !== 'host') return;
+            isPaused = !isPaused;
+            document.getElementById('pauseOverlay').style.display = isPaused ? 'flex' : 'none';
+            if (deviceMode === 'multi') document.getElementById('wordInput').disabled = isPaused;
+        }
+
+        function endRound() {
+            triggerVibration([200, 100, 200]);
+            playAudioTone(400, 0.4);
+
+            document.getElementById('reviewModal').style.display = 'flex';
+
+            let reviewGrid = document.getElementById('reviewDiceGrid');
+            reviewGrid.className = `grid grid-${config.size}`;
+            reviewGrid.innerHTML = '';
+            for (let i = 0; i < currentLetters.length; i++) {
+                let cell = document.createElement('div');
+                cell.className = 'dice mini-dice';
+                cell.textContent = currentLetters[i];
+                reviewGrid.appendChild(cell);
+            }
+
+            if (deviceMode === 'single') {
+                document.getElementById('reviewSubtitle').textContent = "Tempo Scaduto! Verificate le parole sui vostri fogli e inserite i punti:";
+                document.getElementById('multiReviewSection').style.display = 'none';
+                document.getElementById('singleReviewSection').style.display = 'block';
+
+                let tbody = document.getElementById('singleScoreInputsBody');
+                tbody.innerHTML = '';
+                Object.keys(leaderboard).forEach((player, idx) => {
+                    let tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><b>${player}</b></td>
+                        <td style="text-align:center;">
+                            <input type="number" class="manual-score-input" data-player="${player}" value="0" min="0">
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } else {
+                document.getElementById('reviewSubtitle').innerHTML = "Verifica le parole sulla griglia.<br>1 Tap = <b>Mezzo Punteggio</b> | 2 Tap = <b>Annullata</b>";
+                document.getElementById('multiReviewSection').style.display = 'block';
+                document.getElementById('singleReviewSection').style.display = 'none';
+                renderReviewList();
+            }
+        }
+
+        function saveSingleRoundScores() {
+            const inputs = document.querySelectorAll('.manual-score-input');
+            inputs.forEach(input => {
+                let p = input.getAttribute('data-player');
+                let val = parseFloat(input.value) || 0;
+                leaderboard[p] += val;
+            });
+
+            document.getElementById('reviewModal').style.display = 'none';
+            showLeaderboard();
+        }
+
+        function renderReviewList() {
+            let container = document.getElementById('reviewWordList');
+            container.innerHTML = '';
+            let totalRoundScore = 0;
+
+            myWords.forEach((item, index) => {
+                let badge = document.createElement('div');
+                badge.className = `word-badge ${item.state}`;
+                
+                let basePoints = getBasePoints(item.word);
+                let currentPoints = basePoints;
+
+                if (item.state === 'half') currentPoints = basePoints / 2;
+                if (item.state === 'deleted') currentPoints = 0;
+
+                totalRoundScore += currentPoints;
+
+                badge.textContent = `${item.word} (${currentPoints} ptn)`;
+                badge.onclick = () => toggleWordState(index);
+                container.appendChild(badge);
+            });
+
+            document.getElementById('roundScoreDisplay').textContent = totalRoundScore;
+        }
+
+        function toggleWordState(index) {
+            triggerVibration(30);
+            let states = ['full', 'half', 'deleted'];
+            let nextIndex = (states.indexOf(myWords[index].state) + 1) % states.length;
+            myWords[index].state = states[nextIndex];
+            renderReviewList();
+        }
+
+        function getBasePoints(w) {
+            if (config.scoringMode === 'perLetter') {
+                return w.length;
+            } else if (config.scoringMode === 'perWord') {
+                return 1;
+            } else {
+                let len = w.length;
+                if (len <= 4) return 1;
+                if (len === 5) return 2;
+                if (len === 6) return 3;
+                if (len === 7) return 5;
+                return 11;
+            }
+        }
+
+        function confirmRoundScore() {
+            let roundPoints = parseFloat(document.getElementById('roundScoreDisplay').textContent);
+            leaderboard[myName] += roundPoints;
+
+            document.getElementById('reviewModal').style.display = 'none';
+            showLeaderboard();
+        }
+
+        function showLeaderboard() {
+            let tbody = document.getElementById('leaderboardBody');
+            tbody.innerHTML = '';
+
+            let sorted = Object.entries(leaderboard).sort((a, b) => b[1] - a[1]);
+            sorted.forEach(([player, score]) => {
+                let tr = document.createElement('tr');
+                tr.innerHTML = `<td><b>${player}</b></td><td>${score} ptn</td>`;
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById('leaderboardModal').style.display = 'flex';
+        }
+
+        function returnToLobbyNextRound() {
+            document.getElementById('leaderboardModal').style.display = 'none';
+            document.getElementById('gameArea').style.display = 'none';
+
+            if (deviceMode === 'single') {
+                roomCode = generateSeedCode();
+                document.getElementById('gameArea').style.display = 'flex';
+                startTableRound();
+            } else {
+                document.getElementById('lobbyPanel').style.display = 'block';
+            }
+        }
+
+        function resetAll() {
+            location.href = window.location.pathname;
+        }
+    </script>
+</body>
+</html>
