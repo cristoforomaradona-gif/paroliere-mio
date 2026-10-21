@@ -635,7 +635,6 @@
                 document.getElementById('roomCodeInput').value = roomParam.toUpperCase();
             }
 
-            // CONTROLLO RIPRISTINO AUTOMATICO DA RICARICA
             loadFromLocalStorage();
         });
 
@@ -1127,7 +1126,6 @@
             location.href = window.location.pathname;
         }
 
-        // --- GESTIONE LOCALSTORAGE (ANTI-RICARICA ACCIDENTALE) ---
         function saveToLocalStorage(step) {
             const state = {
                 step: step,
@@ -1185,7 +1183,6 @@
 
                     renderWordList();
                     generateGridFromSeed();
-                    // Ripristina un timer di sicurezza a 30 secondi in caso di ricarica inattesa
                     timeLeft = 30; 
                     startTimer();
                 }
