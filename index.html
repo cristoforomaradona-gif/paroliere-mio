@@ -869,7 +869,7 @@
                 conn.playerName = data.name;
                 leaderboard[data.name] = 0;
             } else if (data.type === 'SUBMIT_SCORE') {
-                // L'Host registra il punteggio e la conferma del guest in modo indipendente
+                // L'host riceve i dati del guest ma NON mostra la classifica globale finché l'host non ha confermato i suoi
                 let pName = conn.playerName || data.name;
                 leaderboard[pName] = data.score;
                 confirmedPlayers[pName] = true;
@@ -877,17 +877,17 @@
                 let totalExpected = guestConnections.length + 1;
                 let totalConfirmed = Object.keys(confirmedPlayers).length;
 
-                // Invia la classifica aggiornata e lo stato delle conferme a tutti i guest
-                broadcastToGuests({ 
-                    type: 'UPDATE_LEADERBOARD', 
-                    leaderboard: leaderboard, 
-                    confirmedPlayers: confirmedPlayers,
-                    confirmedCount: totalConfirmed, 
-                    totalExpected: totalExpected 
-                });
-                
-                // Aggiorna la schermata dell'host localmente senza forzare la chiusura altrui
-                updateLeaderboardUILocally(leaderboard, totalConfirmed, totalExpected);
+                // Se l'host ha già confermato i suoi punti, aggiorna e propaga a tutti. Altrimenti aspetta che l'host confermi.
+                if (confirmedPlayers[myName]) {
+                    broadcastToGuests({ 
+                        type: 'UPDATE_LEADERBOARD', 
+                        leaderboard: leaderboard, 
+                        confirmedPlayers: confirmedPlayers,
+                        confirmedCount: totalConfirmed, 
+                        totalExpected: totalExpected 
+                    });
+                    updateLeaderboardUILocally(leaderboard, totalConfirmed, totalExpected);
+                }
             }
         }
 
@@ -905,7 +905,10 @@
             } else if (data.type === 'UPDATE_LEADERBOARD') {
                 leaderboard = data.leaderboard;
                 confirmedPlayers = data.confirmedPlayers || confirmedPlayers;
-                updateLeaderboardUILocally(leaderboard, data.confirmedCount, data.totalExpected);
+                // Aggiorna la classifica del guest solo se il guest ha già confermato i suoi punti
+                if (confirmedPlayers[myName]) {
+                    updateLeaderboardUILocally(leaderboard, data.confirmedCount, data.totalExpected);
+                }
             } else if (data.type === 'TERMINATE_ROOM') {
                 showToast("L'Host ha terminato la partita.");
                 resetAll();
@@ -1182,7 +1185,7 @@
             leaderboard[myName] = (leaderboard[myName] || 0) + roundPoints;
             confirmedPlayers[myName] = true;
 
-            // Disabilita solo il pulsante sul proprio dispositivo
+            // Disabilita il pulsante solo localmente
             document.getElementById('confirmScoreBtn').disabled = true;
             document.getElementById('reviewModal').style.display = 'none';
 
@@ -1199,9 +1202,8 @@
                     totalExpected: totalExpected 
                 });
             } else {
-                // Il guest invia i suoi dati all'host in modo indipendente
+                // Il guest invia i dati all'host ma resta in attesa sulla propria classifica locale
                 hostConnection.send({ type: 'SUBMIT_SCORE', name: myName, score: leaderboard[myName] });
-                showLeaderboardModal();
                 updateLeaderboardUILocally(leaderboard, totalConfirmed, totalExpected);
             }
         }
@@ -1240,10 +1242,6 @@
             }
         }
 
-        function showLeaderboardModal() {
-            document.getElementById('leaderboardModal').style.display = 'flex';
-        }
-
         function hostNextRound() {
             if (role !== 'host') return;
             hostStartMatch();
@@ -1264,6 +1262,7 @@
                 targetEndTime: targetEndTime,
                 currentLetters: currentLetters,
                 leaderboard: leaderboard,
+                confirmedPlayers: confirmedPlayers,
                 roundCounter: roundCounter
             };
             localStorage.setItem('paroliere_session', JSON.stringify(state));
@@ -1284,6 +1283,7 @@
                 targetEndTime = state.targetEndTime || 0;
                 currentLetters = state.currentLetters || [];
                 leaderboard = state.leaderboard || {};
+                confirmedPlayers = state.confirmedPlayers || {};
                 roundCounter = state.roundCounter || 0;
 
                 if (role === 'host') {
@@ -1293,6 +1293,10 @@
                     peer.on('open', () => {
                         if (state.step === 'game' && targetEndTime > Date.now()) {
                             enterGameAreaFromRemote();
+                        } else if (state.step === 'review' || (state.step === 'game' && targetEndTime <= Date.now())) {
+                            // Se ricarica durante la revisione
+                            document.getElementById('gameArea').style.display = 'flex';
+                            endRound();
                         } else {
                             showLobbyUI();
                         }
@@ -1347,6 +1351,7 @@
                         clearInterval(cInterval);
                         lid.classList.add('open');
                         targetEndTime = Date.now() + (config.totalSeconds * 1000);
+                        saveToLocalStorage('game');
                         startTimerWithTarget(targetEndTime);
                     }
                 }, 1000);
