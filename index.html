@@ -317,6 +317,7 @@
             justify-content: center;
             font-size: 1.3rem;
             font-weight: 900;
+            color: #ffffff !important;
         }
 
         .mini-dice {
@@ -557,7 +558,6 @@
         <div class="modal-card">
             <h2>Tempo Scaduto!</h2>
             
-            <!-- LEGENDA TAP -->
             <div class="review-legend">
                 <span style="color: var(--accent);">🟢 Pieni</span>
                 <span style="color: var(--warning);">🟡 1 Tap (1/2 Ptn)</span>
@@ -627,6 +627,7 @@
         let isPaused = false;
         let currentLetters = [];
         let targetEndTime = 0;
+        let roundCounter = 1;
 
         let peer = null;
         let hostConnection = null;
@@ -851,6 +852,7 @@
                 config = data.config;
                 targetEndTime = data.targetEndTime;
                 currentLetters = data.letters;
+                roundCounter = data.roundCounter || 1;
                 saveToLocalStorage('game');
                 enterGameAreaFromRemote();
             } else if (data.type === 'PAUSE_GAME') {
@@ -876,18 +878,20 @@
         }
 
         function hostStartMatch() {
+            roundCounter++;
             targetEndTime = Date.now() + (config.totalSeconds * 1000);
             
-            let seed = pseudorandomFromSeed(roomCode);
+            let seed = pseudorandomFromSeed(roomCode + "_" + roundCounter);
             let totalCells = config.size * config.size;
-            let shuffledDice = [...realDiceItalian].sort(() => seed - 0.5).slice(0, totalCells);
-            currentLetters = shuffledDice.map(die => die[Math.floor(seed * die.length)]).sort(() => seed - 0.5);
+            let shuffledDice = [...realDiceItalian].sort(() => seed() - 0.5).slice(0, totalCells);
+            currentLetters = shuffledDice.map(die => die[Math.floor(seed() * die.length)]).sort(() => seed() - 0.5);
 
             broadcastToGuests({
                 type: 'START_GAME',
                 config: config,
                 targetEndTime: targetEndTime,
-                letters: currentLetters
+                letters: currentLetters,
+                roundCounter: roundCounter
             });
 
             saveToLocalStorage('game');
@@ -896,6 +900,7 @@
 
         function enterGameAreaFromRemote() {
             document.getElementById('lobbyPanel').style.display = 'none';
+            document.getElementById('leaderboardModal').style.display = 'none';
             document.getElementById('gameArea').style.display = 'flex';
             document.getElementById('digitalNotepad').style.display = 'block';
             document.getElementById('rotateBtn').style.display = 'none';
@@ -915,10 +920,31 @@
             document.getElementById('wordInput').disabled = false;
 
             let lid = document.getElementById('lid');
-            lid.classList.add('open');
+            lid.style.display = 'flex';
+            lid.classList.remove('open');
 
-            renderGridFromLetters(currentLetters);
-            startTimerWithTarget(endTimestamp);
+            // Conto alla rovescia 3, 2, 1 sincronizzato prima di togliere il coperchio
+            document.getElementById('lidTitle').textContent = `Round ${roundCounter} in arrivo...`;
+            document.getElementById('countdownNum').style.display = 'none';
+
+            setTimeout(() => {
+                document.getElementById('countdownNum').style.display = 'block';
+                document.getElementById('lidTitle').textContent = "La partita inizia tra:";
+                let count = 3;
+                document.getElementById('countdownNum').textContent = count;
+
+                let cInterval = setInterval(() => {
+                    count--;
+                    if (count > 0) {
+                        document.getElementById('countdownNum').textContent = count;
+                    } else {
+                        clearInterval(cInterval);
+                        lid.classList.add('open');
+                        renderGridFromLetters(currentLetters);
+                        startTimerWithTarget(endTimestamp);
+                    }
+                }, 1000);
+            }, 800);
         }
 
         function renderGridFromLetters(letters) {
@@ -985,7 +1011,6 @@
                 triggerVibration([50, 50, 50]);
                 playAudioTone(250, 0.15);
             } else {
-                // state: 'full', 'half', 'deleted'
                 myWords.push({ word: w, state: 'full' });
                 triggerVibration(40);
                 playAudioTone(800, 0.08);
@@ -1087,7 +1112,6 @@
 
                 badge.textContent = `${item.word} (${currentPoints} ptn)`;
                 
-                // Cliccando cicla tra: full -> half -> deleted -> full
                 badge.onclick = () => {
                     if (item.state === 'full') item.state = 'half';
                     else if (item.state === 'half') item.state = 'deleted';
@@ -1111,7 +1135,7 @@
                 broadcastToGuests({ type: 'UPDATE_LEADERBOARD', leaderboard: leaderboard });
             } else {
                 hostConnection.send({ type: 'SUBMIT_SCORE', name: myName, score: leaderboard[myName] });
-                showToast("Punteggio inviato all'Host!");
+                showToast("Punteggio inviato! In attesa dell'Host...");
             }
         }
 
@@ -1129,14 +1153,19 @@
             document.getElementById('leaderboardModal').style.display = 'flex';
             if (role === 'host') {
                 document.getElementById('nextRoundBtn').style.display = 'block';
+                document.getElementById('nextRoundBtn').textContent = "AVVIA PROSSIMO ROUND 🔄";
+            } else {
+                // Messaggio per gli ospiti in classifica
+                let nextBtnNotice = document.getElementById('nextRoundBtn');
+                nextBtnNotice.style.display = 'block';
+                nextBtnNotice.disabled = true;
+                nextBtnNotice.textContent = "In attesa che l'Host avvii il nuovo round...";
             }
         }
 
         function hostNextRound() {
-            document.getElementById('leaderboardModal').style.display = 'none';
-            document.getElementById('gameArea').style.display = 'none';
-            document.getElementById('lobbyPanel').style.display = 'block';
-            saveToLocalStorage('lobby');
+            if (role !== 'host') return;
+            hostStartMatch();
         }
 
         function resetAll() {
@@ -1153,7 +1182,8 @@
                 config: config,
                 targetEndTime: targetEndTime,
                 currentLetters: currentLetters,
-                leaderboard: leaderboard
+                leaderboard: leaderboard,
+                roundCounter: roundCounter
             };
             localStorage.setItem('paroliere_session', JSON.stringify(state));
         }
@@ -1173,6 +1203,7 @@
                 targetEndTime = state.targetEndTime || 0;
                 currentLetters = state.currentLetters || [];
                 leaderboard = state.leaderboard || {};
+                roundCounter = state.roundCounter || 1;
 
                 if (role === 'host') {
                     document.getElementById('setupPanel').style.display = 'none';
