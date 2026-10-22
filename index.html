@@ -581,6 +581,7 @@
         let timerInterval = null;
         let timeLeft = 0;
         let isPaused = false;
+        let pauseStartTime = 0; // Traccia l'inizio della pausa
         let currentLetters = [];
         let targetEndTime = 0;
         let startTime = 0;
@@ -839,10 +840,19 @@
                 currentLetters = data.letters;
                 roundCounter = data.roundCounter || 1;
                 confirmedPlayers = {};
+                isPaused = false;
                 saveToLocalStorage('game');
                 enterGameAreaFromRemote();
             } else if (data.type === 'PAUSE_GAME') {
-                triggerRemotePause(data.isPaused);
+                isPaused = data.isPaused;
+                if (isPaused) {
+                    pauseStartTime = getCorrectedNow();
+                } else {
+                    // Quando riprende, sposta in avanti il targetEndTime del tempo esatto in cui è rimasto in pausa
+                    let pauseDuration = getCorrectedNow() - pauseStartTime;
+                    targetEndTime += pauseDuration;
+                }
+                triggerRemotePause(isPaused);
             } else if (data.type === 'UPDATE_LEADERBOARD') {
                 leaderboard = data.leaderboard;
                 confirmedPlayers = data.confirmedPlayers || confirmedPlayers;
@@ -873,6 +883,7 @@
         function hostStartMatch() {
             roundCounter++;
             confirmedPlayers = {};
+            isPaused = false;
             
             const now = Date.now();
             startTime = now + 3000;
@@ -880,7 +891,7 @@
             
             let seed = pseudorandomFromSeed(roomCode + "_" + roundCounter);
             let totalCells = config.size * config.size;
-            let shuffledDice = [...realDiceItalian].sort(() => seed() - 0.5).slice(0, totalCells);
+            let shuffledDice = [...realDiceItalian].sort(() => seed - 0.5).slice(0, totalCells);
             currentLetters = shuffledDice.map(die => die[Math.floor(seed() * die.length)]).sort(() => seed() - 0.5);
 
             broadcastToGuests({
@@ -1044,6 +1055,13 @@
         function togglePause() {
             if (deviceMode === 'multi' && role !== 'host') return;
             isPaused = !isPaused;
+
+            if (isPaused) {
+                pauseStartTime = getCorrectedNow();
+            } else {
+                let pauseDuration = getCorrectedNow() - pauseStartTime;
+                targetEndTime += pauseDuration;
+            }
 
             broadcastToGuests({ type: 'PAUSE_GAME', isPaused: isPaused });
             triggerRemotePause(isPaused);
