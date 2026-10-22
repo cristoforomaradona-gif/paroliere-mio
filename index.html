@@ -185,7 +185,7 @@
             font-size: 0.85rem;
             font-weight: bold;
             box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-            z-index: 1000;
+            z-index: 5000;
             transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             pointer-events: none;
         }
@@ -257,26 +257,33 @@
             box-shadow: 0 8px 20px rgba(0,0,0,0.4);
             width: 100%;
             transition: transform 0.4s ease;
+            overflow: hidden;
         }
 
-        /* COPERCHIO TOTALMENTE OPACO E SICURO */
+        /* COPERCHIO TOTALMENTE OPACO SENZA TRASPARENZE */
         .lid {
             position: absolute;
-            inset: 0;
-            background-color: #121213;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #121213 !important;
             border: 2px solid var(--border);
             border-radius: 12px;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            z-index: 10;
-            transition: transform 0.8s cubic-bezier(0.77, 0, 0.175, 1), opacity 0.5s ease;
+            z-index: 100;
+            opacity: 1 !important;
+            visibility: visible !important;
+            transition: transform 0.8s cubic-bezier(0.77, 0, 0.175, 1), opacity 0.5s ease, visibility 0.5s;
         }
 
         .lid.open {
-            transform: translateY(-110%) rotateX(45deg);
-            opacity: 0;
+            transform: translateY(-110%);
+            opacity: 0 !important;
+            visibility: hidden !important;
             pointer-events: none;
         }
 
@@ -288,16 +295,20 @@
             100% { transform: translate(1px, 2px); }
         }
 
+        /* PAUSA COMPLETAMENTE OPACA */
         .pause-overlay {
             position: absolute;
-            inset: 0;
-            background-color: rgba(18, 18, 19, 0.96);
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #121213 !important;
             border-radius: 12px;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            z-index: 20;
+            z-index: 200;
             gap: 12px;
             padding: 20px;
             display: none;
@@ -363,12 +374,12 @@
         .modal {
             position: fixed;
             inset: 0;
-            background: rgba(0,0,0,0.92);
+            background: rgba(0,0,0,0.95);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            z-index: 100;
+            z-index: 1000;
             padding: 12px;
             display: none;
         }
@@ -835,12 +846,13 @@
 
         function startTableRound() {
             let lid = document.getElementById('lid');
-            lid.style.display = 'flex';
             lid.classList.remove('open');
+            lid.style.display = 'flex';
             lid.classList.add('shaking');
             document.getElementById('lidTitle').textContent = "Mescolando i dadi...";
             document.getElementById('countdownNum').style.display = 'none';
 
+            // Genera la griglia mentre il coperchio è già chiuso
             generateGridFromSeed();
 
             setTimeout(() => {
@@ -903,6 +915,10 @@
             myWords = [];
             renderWordList();
             document.getElementById('wordInput').disabled = false;
+
+            // Assicura che il coperchio rimanga aperto durante la modalità multi-telefono regolare
+            let lid = document.getElementById('lid');
+            lid.classList.add('open');
 
             generateGridFromSeed();
             
