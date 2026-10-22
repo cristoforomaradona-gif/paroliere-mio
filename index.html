@@ -355,10 +355,11 @@
             font-size: 0.85rem;
             font-weight: bold;
             touch-action: manipulation;
+            cursor: pointer;
         }
 
         .word-badge.deleted { text-decoration: line-through; opacity: 0.4; }
-        .word-badge.half { border-color: var(--warning); color: var(--warning); }
+        .word-badge.duplicate { border-color: var(--warning); color: var(--warning); }
 
         .modal {
             position: fixed;
@@ -545,8 +546,8 @@
         <div class="modal-card">
             <h2>Tempo Scaduto!</h2>
             <p id="reviewSubtitle" style="font-size:0.75rem; color: var(--text-muted); text-align:center; margin-bottom:8px;">
-                Verifica le parole sulla griglia.<br>
-                1 Tap = <b>Mezzo Punteggio</b> | 2 Tap = <b>Annullata</b>
+                Verifica le tue parole sulla griglia.<br>
+                <b>Giallo</b> = Doppia (Mezzo Punto) | <b>Tap</b> = Annulla Parola
             </p>
 
             <div class="grid-wrapper" style="padding: 6px; margin-bottom: 8px;">
@@ -606,6 +607,7 @@
         let myName = "Giocatore";
         let roomCode = "";
         let myWords = [];
+        let allPlayersWords = {};
         let leaderboard = {};
         let timerInterval = null;
         let timeLeft = 0;
@@ -828,9 +830,12 @@
             if (data.type === 'JOIN') {
                 conn.playerName = data.name;
                 leaderboard[data.name] = 0;
-            } else if (data.type === 'SUBMIT_SCORE') {
-                leaderboard[data.name] = data.score;
-                broadcastToGuests({ type: 'UPDATE_LEADERBOARD', leaderboard: leaderboard });
+            } else if (data.type === 'SUBMIT_WORDS') {
+                allPlayersWords[data.name] = data.words;
+                
+                if (Object.keys(allPlayersWords).length === guestConnections.length + 1) {
+                    calculateAndBroadcastLeaderboard();
+                }
             }
         }
 
@@ -865,6 +870,7 @@
 
         function hostStartMatch() {
             targetEndTime = Date.now() + (config.totalSeconds * 1000);
+            allPlayersWords = {};
             
             let seed = pseudorandomFromSeed(roomCode);
             let totalCells = config.size * config.size;
@@ -962,17 +968,22 @@
             let input = document.getElementById('wordInput');
             let w = input.value.trim().toUpperCase();
 
-            if (w.length >= 3) {
-                if (myWords.some(item => item.word === w)) {
-                    showToast("⚠️ Parola già inserita!");
-                    triggerVibration([50, 50, 50]);
-                    playAudioTone(250, 0.15);
-                } else {
-                    myWords.push({ word: w, state: 'full' });
-                    triggerVibration(40);
-                    playAudioTone(800, 0.08);
-                    renderWordList();
-                }
+            // Rifiuta direttamente le parole con meno di 3 lettere
+            if (w.length < 3) {
+                showToast("⚠️ Minimo 3 lettere!");
+                input.value = '';
+                return;
+            }
+
+            if (myWords.some(item => item.word === w)) {
+                showToast("⚠️ Parola già inserita!");
+                triggerVibration([50, 50, 50]);
+                playAudioTone(250, 0.15);
+            } else {
+                myWords.push({ word: w, state: 'full' });
+                triggerVibration(40);
+                playAudioTone(800, 0.08);
+                renderWordList();
             }
             input.value = '';
         }
@@ -1040,22 +1051,38 @@
             }
         }
 
+        // --- CALCOLO PUNTEGGI UFFICIALE PAROLIERE ---
+        function getBasePoints(w) {
+            if (w.length < 3) return 0; // Parole sotto 3 lettere valgono 0
+
+            if (config.scoringMode === 'perLetter') return w.length;
+            if (config.scoringMode === 'perWord') return 1;
+
+            // Modalità Classica Paroliere
+            let len = w.length;
+            if (len === 3 || len === 4) return 1;
+            if (len === 5) return 2;
+            if (len === 6) return 3;
+            if (len === 7) return 5;
+            return 11;
+        }
+
         function renderReviewList() {
             let container = document.getElementById('reviewWordList');
             container.innerHTML = '';
             let totalRoundScore = 0;
 
-            myWords.forEach((item, index) => {
+            myWords.forEach((item) => {
                 let badge = document.createElement('div');
                 badge.className = `word-badge ${item.state}`;
                 let basePoints = getBasePoints(item.word);
-                let currentPoints = item.state === 'half' ? basePoints / 2 : (item.state === 'deleted' ? 0 : basePoints);
+                let currentPoints = item.state === 'deleted' ? 0 : basePoints;
                 totalRoundScore += currentPoints;
 
                 badge.textContent = `${item.word} (${currentPoints} ptn)`;
                 badge.onclick = () => {
-                    let states = ['full', 'half', 'deleted'];
-                    item.state = states[(states.indexOf(item.state) + 1) % states.length];
+                    // Tap per annullare/ripristinare la parola
+                    item.state = item.state === 'full' ? 'deleted' : 'full';
                     renderReviewList();
                 };
                 container.appendChild(badge);
@@ -1064,30 +1091,55 @@
             document.getElementById('roundScoreDisplay').textContent = totalRoundScore;
         }
 
-        function getBasePoints(w) {
-            if (config.scoringMode === 'perLetter') return w.length;
-            if (config.scoringMode === 'perWord') return 1;
-            let len = w.length;
-            if (len <= 4) return 1;
-            if (len === 5) return 2;
-            if (len === 6) return 3;
-            if (len === 7) return 5;
-            return 11;
-        }
-
         function confirmRoundScore() {
-            let roundPoints = parseFloat(document.getElementById('roundScoreDisplay').textContent);
-            leaderboard[myName] = (leaderboard[myName] || 0) + roundPoints;
-
+            // Prende sia la parola che il suo stato (valida o cancellata)
+            let processedWords = myWords.map(item => ({ word: item.word, isDeleted: item.state === 'deleted' }));
             document.getElementById('reviewModal').style.display = 'none';
 
             if (role === 'host') {
-                showLeaderboardModal();
-                broadcastToGuests({ type: 'UPDATE_LEADERBOARD', leaderboard: leaderboard });
+                allPlayersWords[myName] = processedWords;
+                if (Object.keys(allPlayersWords).length === guestConnections.length + 1) {
+                    calculateAndBroadcastLeaderboard();
+                } else {
+                    showToast("In attesa degli altri giocatori...");
+                }
             } else {
-                hostConnection.send({ type: 'SUBMIT_SCORE', name: myName, score: leaderboard[myName] });
-                showToast("Punteggio inviato all'Host!");
+                hostConnection.send({ type: 'SUBMIT_WORDS', name: myName, words: processedWords });
+                showToast("Parole inviate all'Host! In attesa della classifica...");
             }
+        }
+
+        // --- CALCOLO AUTOMATICO MEZZI PUNTI ---
+        function calculateAndBroadcastLeaderboard() {
+            let wordCounts = {};
+
+            // 1. Mappa le parole non cancellate scritte da ciascun giocatore
+            Object.values(allPlayersWords).forEach(wordObjList => {
+                let validWords = wordObjList.filter(o => !o.isDeleted).map(o => o.word);
+                let uniqueList = [...new Set(validWords)];
+                uniqueList.forEach(w => {
+                    wordCounts[w] = (wordCounts[w] || 0) + 1;
+                });
+            });
+
+            // 2. Assegna i punti (pieni se unica, dimezzati se in comune)
+            Object.keys(allPlayersWords).forEach(player => {
+                let score = 0;
+                allPlayersWords[player].forEach(item => {
+                    if (!item.isDeleted) {
+                        let base = getBasePoints(item.word);
+                        if (wordCounts[item.word] > 1) {
+                            score += (base / 2); // Mezzo punteggio per le doppie
+                        } else {
+                            score += base;
+                        }
+                    }
+                });
+                leaderboard[player] = (leaderboard[player] || 0) + score;
+            });
+
+            broadcastToGuests({ type: 'UPDATE_LEADERBOARD', leaderboard: leaderboard });
+            showLeaderboardModal();
         }
 
         function showLeaderboardModal() {
@@ -1149,7 +1201,6 @@
                 currentLetters = state.currentLetters || [];
                 leaderboard = state.leaderboard || {};
 
-                // Se l'host ricarica mentre è in game o in lobby, ripristina la sua schermata locale senza toccare i peer
                 if (role === 'host') {
                     document.getElementById('setupPanel').style.display = 'none';
                     peer = new Peer("paroliere_" + roomCode);
@@ -1172,7 +1223,6 @@
                         });
                     });
                 } else if (role === 'guest') {
-                    // Se l'ospite ricarica, si riconnette all'host
                     document.getElementById('setupPanel').style.display = 'none';
                     peer = new Peer();
                     peer.on('open', () => {
