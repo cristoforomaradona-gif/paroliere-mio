@@ -586,7 +586,7 @@
         let targetEndTime = 0;
         let startTime = 0;
         let roundCounter = 0;
-        let timeOffset = 0; // Differenza millisecondi con l'Host
+        let timeOffset = 0;
 
         let peer = null;
         let hostConnection = null;
@@ -778,7 +778,6 @@
                 document.getElementById('guestLobbyNotice').style.display = 'block';
                 document.getElementById('hostLobbyNotice').style.display = 'none';
                 
-                // Richiedi sincronizzazione orologio
                 const sendTime = Date.now();
                 hostConnection.send({ type: 'JOIN', name: myName, sendTime: sendTime });
             });
@@ -808,7 +807,6 @@
                 conn.playerName = data.name;
                 leaderboard[data.name] = 0;
                 
-                // Rispondi con l'orario attuale dell'Host per calcolare l'offset
                 const hostNow = Date.now();
                 conn.send({ type: 'SYNC_TIME', hostTime: hostNow, clientSendTime: data.sendTime });
             } else if (data.type === 'SUBMIT_SCORE') {
@@ -819,16 +817,17 @@
                 let totalExpected = guestConnections.length + 1;
                 let totalConfirmed = Object.keys(confirmedPlayers).length;
 
-                if (confirmedPlayers[myName]) {
-                    broadcastToGuests({ 
-                        type: 'UPDATE_LEADERBOARD', 
-                        leaderboard: leaderboard, 
-                        confirmedPlayers: confirmedPlayers,
-                        confirmedCount: totalConfirmed, 
-                        totalExpected: totalExpected 
-                    });
-                    updateLeaderboardUILocally(leaderboard, totalConfirmed, totalExpected);
-                }
+                // Propaga lo stato delle conferme a tutti, ma SENZA forzare la chiusura delle schermate altrui
+                broadcastToGuests({ 
+                    type: 'UPDATE_LEADERBOARD', 
+                    leaderboard: leaderboard, 
+                    confirmedPlayers: confirmedPlayers,
+                    confirmedCount: totalConfirmed, 
+                    totalExpected: totalExpected 
+                });
+                
+                // Aggiorna la classifica visibile sul dispositivo dell'host in modo indipendente
+                updateLeaderboardUILocally(leaderboard, totalConfirmed, totalExpected);
             }
         }
 
@@ -836,7 +835,6 @@
             if (data.type === 'SYNC_TIME') {
                 const now = Date.now();
                 const rtt = now - data.clientSendTime;
-                // L'orario reale dell'host al momento della ricezione
                 const estimatedHostTime = data.hostTime + (rtt / 2);
                 timeOffset = estimatedHostTime - now;
             } else if (data.type === 'START_GAME') {
@@ -853,8 +851,14 @@
             } else if (data.type === 'UPDATE_LEADERBOARD') {
                 leaderboard = data.leaderboard;
                 confirmedPlayers = data.confirmedPlayers || confirmedPlayers;
-                if (confirmedPlayers[myName]) {
-                    updateLeaderboardUILocally(leaderboard, data.confirmedCount, data.totalExpected);
+                
+                let totalExpected = guestConnections.length + 1;
+                let totalConfirmed = Object.keys(confirmedPlayers).length;
+                
+                // Aggiorna la tabella delle conferme in tempo reale per tutti, 
+                // ma NON chiude la modale di revisione del giocatore se lui non ha ancora premuto Conferma!
+                if (document.getElementById('leaderboardModal').style.display === 'flex') {
+                    updateLeaderboardUILocally(leaderboard, totalConfirmed, totalExpected);
                 }
             } else if (data.type === 'TERMINATE_ROOM') {
                 showToast("L'Host ha terminato la partita.");
@@ -877,7 +881,6 @@
             roundCounter++;
             confirmedPlayers = {};
             
-            // Inizio differito di 3 secondi basato sull'orologio dell'Host
             const now = Date.now();
             startTime = now + 3000;
             targetEndTime = startTime + (config.totalSeconds * 1000);
@@ -950,7 +953,7 @@
                         }
                     }, 1000);
                 }
-            }, 50);
+            }, 20); // Controllo ultra-rapido a 20ms per sincronizzare l'apertura del coperchio al millisecondo
         }
 
         function renderGridFromLetters(letters) {
@@ -1141,6 +1144,7 @@
             leaderboard[myName] = (leaderboard[myName] || 0) + roundPoints;
             confirmedPlayers[myName] = true;
 
+            // Disabilita il pulsante e chiude la revisione SOLO per chi ha cliccato
             document.getElementById('confirmScoreBtn').disabled = true;
             document.getElementById('reviewModal').style.display = 'none';
 
@@ -1158,6 +1162,7 @@
                 });
             } else {
                 hostConnection.send({ type: 'SUBMIT_SCORE', name: myName, score: leaderboard[myName] });
+                // Mostra la classifica in modalità di attesa finché l'host non dà il via
                 updateLeaderboardUILocally(leaderboard, totalConfirmed, totalExpected);
             }
         }
