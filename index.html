@@ -472,7 +472,6 @@
                 <div class="hud-tools">
                     <button class="tool-btn" id="rotateBtn" style="display:none;" onclick="rotateGrid()">🔄 Ruota</button>
                     <button class="tool-btn" id="toggleSoundBtn" onclick="toggleAudio()">🔔</button>
-                    <button class="tool-btn" id="toggleVibeBtn" onclick="toggleVibrationSetting()">📳</button>
                     <button class="tool-btn" id="hostPauseBtn" style="display:none;" onclick="togglePause()">⏸️</button>
                 </div>
             </div>
@@ -573,7 +572,7 @@
         let deviceMode = 'multi';
         let role = 'host';
         let config = { size: 5, totalSeconds: 180, scoringMode: 'classic' };
-        let settings = { sound: true, vibe: true };
+        let settings = { sound: true };
         let myName = "Giocatore";
         let roomCode = "";
         let myWords = [];
@@ -587,6 +586,7 @@
         let startTime = 0;
         let roundCounter = 0;
         let timeOffset = 0;
+        let currentRotation = 0;
 
         let peer = null;
         let hostConnection = null;
@@ -656,10 +656,6 @@
             return Math.random().toString(36).substring(2, 6).toUpperCase();
         }
 
-        function triggerVibration(pattern) {
-            if (settings.vibe && "vibrate" in navigator) navigator.vibrate(pattern);
-        }
-
         function playAudioTone(freq, duration) {
             if (!settings.sound) return;
             try {
@@ -682,11 +678,6 @@
             document.getElementById('toggleSoundBtn').classList.toggle('off', !settings.sound);
         }
 
-        function toggleVibrationSetting() {
-            settings.vibe = !settings.vibe;
-            document.getElementById('toggleVibeBtn').classList.toggle('off', !settings.vibe);
-        }
-
         function showToast(msg) {
             const toast = document.getElementById('toastBanner');
             toast.textContent = msg;
@@ -705,6 +696,11 @@
 
         function copyToClipboard(text) {
             navigator.clipboard.writeText(text).then(() => showToast("🔗 Link Stanza Copiato!"));
+        }
+
+        function rotateGrid() {
+            currentRotation = (currentRotation + 90) % 360;
+            document.getElementById('gridWrapper').style.transform = `rotate(${currentRotation}deg)`;
         }
 
         function initLobby() {
@@ -817,7 +813,6 @@
                 let totalExpected = guestConnections.length + 1;
                 let totalConfirmed = Object.keys(confirmedPlayers).length;
 
-                // Propaga i dati della classifica a tutti i client
                 broadcastToGuests({ 
                     type: 'UPDATE_LEADERBOARD', 
                     leaderboard: leaderboard, 
@@ -826,7 +821,6 @@
                     totalExpected: totalExpected 
                 });
                 
-                // Aggiorna l'interfaccia dell'Host solo se l'Host ha già inviato il proprio punteggio
                 if (confirmedPlayers[myName]) {
                     updateLeaderboardUILocally(leaderboard, totalConfirmed, totalExpected);
                 }
@@ -857,7 +851,6 @@
                 let totalExpected = guestConnections.length + 1;
                 let totalConfirmed = Object.keys(confirmedPlayers).length;
                 
-                // L'aggiornamento della modale della classifica avviene SOLO se il giocatore ha già completato la propria revisione
                 if (document.getElementById('leaderboardModal').style.display === 'flex') {
                     updateLeaderboardUILocally(leaderboard, totalConfirmed, totalExpected);
                 }
@@ -1022,11 +1015,9 @@
 
             if (myWords.some(item => item.word === w)) {
                 showToast("⚠️ Parola già inserita!");
-                triggerVibration([50, 50, 50]);
                 playAudioTone(250, 0.15);
             } else {
                 myWords.push({ word: w, state: 'full' });
-                triggerVibration(40);
                 playAudioTone(800, 0.08);
                 renderWordList();
             }
@@ -1076,7 +1067,6 @@
         }
 
         function endRound() {
-            triggerVibration([200, 100, 200]);
             playAudioTone(400, 0.4);
 
             document.getElementById('reviewModal').style.display = 'flex';
@@ -1202,7 +1192,12 @@
 
         function hostNextRound() {
             if (role !== 'host') return;
-            hostStartMatch();
+            if (deviceMode === 'single') {
+                document.getElementById('leaderboardModal').style.display = 'none';
+                startTableRound();
+            } else {
+                hostStartMatch();
+            }
         }
 
         function resetAll() {
