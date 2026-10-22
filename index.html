@@ -43,21 +43,9 @@
 
         html { height: -webkit-fill-available; }
 
-        header {
-            text-align: center;
-            margin-bottom: 8px;
-        }
-
-        h1 {
-            font-size: 1.4rem;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-        }
-
-        .subtitle {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-        }
+        header { text-align: center; margin-bottom: 8px; }
+        h1 { font-size: 1.4rem; letter-spacing: 1px; text-transform: uppercase; }
+        .subtitle { font-size: 0.75rem; color: var(--text-muted); }
 
         .main-container {
             width: 100%;
@@ -81,22 +69,9 @@
             margin-bottom: 10px;
         }
 
-        .control-group {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-
-        .control-group label {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            font-weight: bold;
-        }
-
-        .options-row {
-            display: flex;
-            gap: 6px;
-        }
+        .control-group { display: flex; flex-direction: column; gap: 5px; }
+        .control-group label { font-size: 0.8rem; color: var(--text-muted); font-weight: bold; }
+        .options-row { display: flex; gap: 6px; }
 
         .option-btn {
             flex: 1;
@@ -130,17 +105,8 @@
             touch-action: manipulation;
         }
 
-        .time-inputs {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .time-inputs input {
-            text-align: center;
-            font-size: 1.1rem;
-            font-weight: bold;
-        }
+        .time-inputs { display: flex; align-items: center; gap: 8px; }
+        .time-inputs input { text-align: center; font-size: 1.1rem; font-weight: bold; }
 
         .btn-primary {
             width: 100%;
@@ -194,9 +160,7 @@
             pointer-events: none;
         }
 
-        .toast-banner.show {
-            transform: translateX(-50%) translateY(0);
-        }
+        .toast-banner.show { transform: translateX(-50%) translateY(0); }
 
         .lobby-panel { text-align: center; display: none; }
         .code-box {
@@ -234,11 +198,7 @@
             font-variant-numeric: tabular-nums;
         }
 
-        .hud-tools {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
+        .hud-tools { display: flex; align-items: center; gap: 6px; }
 
         .tool-btn {
             background: var(--panel-color);
@@ -289,18 +249,8 @@
             pointer-events: none;
         }
 
-        .lid-content {
-            text-align: center;
-            padding: 20px;
-            width: 100%;
-        }
-
-        .lid-title {
-            font-weight: bold;
-            font-size: 1.1rem;
-            margin-bottom: 15px;
-            color: var(--text-main);
-        }
+        .lid-content { text-align: center; padding: 20px; width: 100%; }
+        .lid-title { font-weight: bold; font-size: 1.1rem; margin-bottom: 15px; color: var(--text-main); }
 
         .countdown-num {
             font-size: 4rem !important;
@@ -342,18 +292,9 @@
             color: #ffffff !important;
         }
 
-        .mini-dice {
-            font-size: 0.85rem !important;
-            border-width: 1px !important;
-            border-radius: 4px !important;
-        }
+        .mini-dice { font-size: 0.85rem !important; border-width: 1px !important; border-radius: 4px !important; }
 
-        .word-input-container {
-            width: 100%;
-            display: flex;
-            gap: 6px;
-            margin-top: 10px;
-        }
+        .word-input-container { width: 100%; display: flex; gap: 6px; margin-top: 10px; }
 
         .word-list {
             width: 100%;
@@ -422,19 +363,8 @@
 
         .modal-card h2 { text-align: center; margin-bottom: 5px; color: var(--accent); }
 
-        .leaderboard-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 10px 0;
-        }
-
-        .leaderboard-table th, .leaderboard-table td {
-            padding: 8px;
-            text-align: left;
-            border-bottom: 1px solid var(--border);
-            font-size: 0.9rem;
-        }
-
+        .leaderboard-table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        .leaderboard-table th, .leaderboard-table td { padding: 8px; text-align: left; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
         .leaderboard-table th { color: var(--text-muted); }
     </style>
 </head>
@@ -656,10 +586,15 @@
         let targetEndTime = 0;
         let startTime = 0;
         let roundCounter = 0;
+        let timeOffset = 0; // Differenza millisecondi con l'Host
 
         let peer = null;
         let hostConnection = null;
         let guestConnections = [];
+
+        function getCorrectedNow() {
+            return Date.now() + timeOffset;
+        }
 
         window.addEventListener('DOMContentLoaded', () => {
             const urlParams = new URLSearchParams(window.location.search);
@@ -842,7 +777,10 @@
                 showLobbyUI();
                 document.getElementById('guestLobbyNotice').style.display = 'block';
                 document.getElementById('hostLobbyNotice').style.display = 'none';
-                hostConnection.send({ type: 'JOIN', name: myName });
+                
+                // Richiedi sincronizzazione orologio
+                const sendTime = Date.now();
+                hostConnection.send({ type: 'JOIN', name: myName, sendTime: sendTime });
             });
 
             hostConnection.on('data', (data) => handleGuestIncomingData(data));
@@ -869,6 +807,10 @@
             if (data.type === 'JOIN') {
                 conn.playerName = data.name;
                 leaderboard[data.name] = 0;
+                
+                // Rispondi con l'orario attuale dell'Host per calcolare l'offset
+                const hostNow = Date.now();
+                conn.send({ type: 'SYNC_TIME', hostTime: hostNow, clientSendTime: data.sendTime });
             } else if (data.type === 'SUBMIT_SCORE') {
                 let pName = conn.playerName || data.name;
                 leaderboard[pName] = data.score;
@@ -891,7 +833,13 @@
         }
 
         function handleGuestIncomingData(data) {
-            if (data.type === 'START_GAME') {
+            if (data.type === 'SYNC_TIME') {
+                const now = Date.now();
+                const rtt = now - data.clientSendTime;
+                // L'orario reale dell'host al momento della ricezione
+                const estimatedHostTime = data.hostTime + (rtt / 2);
+                timeOffset = estimatedHostTime - now;
+            } else if (data.type === 'START_GAME') {
                 config = data.config;
                 startTime = data.startTime;
                 targetEndTime = data.targetEndTime;
@@ -929,9 +877,9 @@
             roundCounter++;
             confirmedPlayers = {};
             
-            // Inizio differito di 2.5 secondi per dare il tempo al pacchetto P2P di arrivare su tutti i telefoni
+            // Inizio differito di 3 secondi basato sull'orologio dell'Host
             const now = Date.now();
-            startTime = now + 2500;
+            startTime = now + 3000;
             targetEndTime = startTime + (config.totalSeconds * 1000);
             
             let seed = pseudorandomFromSeed(roomCode + "_" + roundCounter);
@@ -981,9 +929,8 @@
             document.getElementById('countdownNum').style.display = 'block';
             document.getElementById('countdownNum').textContent = "Pronti...";
 
-            // Attesa sincronizzata dell'orario esatto di partenza globale
             const syncCheck = setInterval(() => {
-                const now = Date.now();
+                const now = getCorrectedNow();
                 if (now >= startTime) {
                     clearInterval(syncCheck);
                     
@@ -1023,13 +970,13 @@
             targetEndTime = endTimestamp;
             clearInterval(timerInterval);
 
-            const now = Date.now();
+            const now = getCorrectedNow();
             timeLeft = Math.max(0, Math.ceil((targetEndTime - now) / 1000));
             updateTimerDisplay();
 
             timerInterval = setInterval(() => {
                 if (!isPaused) {
-                    const currentTime = Date.now();
+                    const currentTime = getCorrectedNow();
                     timeLeft = Math.max(0, Math.ceil((targetEndTime - currentTime) / 1000));
                     updateTimerDisplay();
 
@@ -1042,7 +989,7 @@
                 } else {
                     targetEndTime += 1000;
                 }
-            }, 200);
+            }, 100);
         }
 
         function pseudorandomFromSeed(str) {
