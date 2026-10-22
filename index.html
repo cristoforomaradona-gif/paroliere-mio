@@ -358,7 +358,7 @@
             cursor: pointer;
         }
 
-        .word-badge.deleted { text-decoration: line-through; opacity: 0.4; }
+        .word-badge.deleted { text-decoration: line-through; opacity: 0.3; border-color: var(--danger); }
         .word-badge.duplicate { border-color: var(--warning); color: var(--warning); background-color: rgba(181, 159, 59, 0.15); }
 
         .review-legend {
@@ -506,7 +506,7 @@
             </div>
 
             <div id="guestLobbyNotice" style="display:none; font-size:0.85rem; color:var(--text-muted); margin-bottom:10px;">
-                Connesso all'Host! In attesa che avvii la partita...
+                Connesso an Host! In attesa che avvii la partita...
             </div>
 
             <button id="startMatchBtn" class="btn-primary" onclick="hostStartMatch()" style="display:none;">AVVIA PARTITA PER TUTTI 🚀</button>
@@ -557,11 +557,9 @@
         <div class="modal-card">
             <h2>Tempo Scaduto!</h2>
             
-            <!-- LEGENDA TABS IN ALTO -->
             <div class="review-legend">
-                <span style="color: var(--accent);">🟢 Pieni (Unica)</span>
-                <span style="color: var(--warning);">🟡 1/2 Punti (Doppia)</span>
-                <span style="color: var(--danger);">❌ Annullata (Tap)</span>
+                <span style="color: var(--accent);">🟢 Valida (Pieni)</span>
+                <span style="color: var(--danger);">❌ Annullata (Tap per escludere)</span>
             </div>
 
             <div class="grid-wrapper" style="padding: 6px; margin-bottom: 8px;">
@@ -571,9 +569,9 @@
             <div id="multiReviewSection">
                 <div id="reviewWordList" class="word-list" style="max-height: 140px; margin-bottom: 8px;"></div>
                 <div style="text-align: center; margin-bottom: 12px; font-size:0.95rem;">
-                    Punti Round: <b id="roundScoreDisplay" style="color:var(--accent); font-size:1.1rem;">0</b>
+                    Punti Base Round: <b id="roundScoreDisplay" style="color:var(--accent); font-size:1.1rem;">0</b>
                 </div>
-                <button class="btn-primary" onclick="confirmRoundScore()">CONFERMA E INVIA PUNTEGGIO</button>
+                <button class="btn-primary" onclick="confirmRoundScore()">CONFERMA E INVIA PAROLE</button>
             </div>
         </div>
     </div>
@@ -626,11 +624,9 @@
         let timerInterval = null;
         let timeLeft = 0;
         let isPaused = false;
-        let currentRotation = 0;
         let currentLetters = [];
         let targetEndTime = 0;
 
-        // PeerJS P2P
         let peer = null;
         let hostConnection = null;
         let guestConnections = [];
@@ -746,7 +742,6 @@
             navigator.clipboard.writeText(text).then(() => showToast("🔗 Link Stanza Copiato!"));
         }
 
-        // --- GESTIONE PEERJS P2P ---
         function initLobby() {
             let min = parseInt(document.getElementById('customMin').value) || 0;
             let sec = parseInt(document.getElementById('customSec').value) || 0;
@@ -847,7 +842,6 @@
             } else if (data.type === 'SUBMIT_WORDS') {
                 allPlayersWords[data.name] = data.words;
                 
-                // Ricevute le parole da tutti, distribuisce le liste grezze a tutti i client per il calcolo locale in tempo reale
                 if (Object.keys(allPlayersWords).length === guestConnections.length + 1) {
                     broadcastToGuests({ type: 'CALCULATE_LEADERBOARD', allWords: allPlayersWords });
                     processAndShowLeaderboard(allPlayersWords);
@@ -1122,11 +1116,10 @@
             }
         }
 
-        // --- RICONOSCIMENTO AUTOMATICO PAROLE UGUALI E COLORAZIONE ---
+        // --- CALCOLO AUTOMATICO MEZZI PUNTI E DUPLICATI ---
         function processAndShowLeaderboard(allWordsData) {
             let wordCounts = {};
 
-            // 1. Conta le occorrenze di ogni parola tra tutti i giocatori
             Object.values(allWordsData).forEach(wordList => {
                 let uniqueWords = [...new Set(wordList)];
                 uniqueWords.forEach(w => {
@@ -1134,14 +1127,13 @@
                 });
             });
 
-            // 2. Calcola i punteggi (dimezzati se duplicate tra utenti)
             leaderboard = {};
             Object.keys(allWordsData).forEach(player => {
                 let score = 0;
                 allWordsData[player].forEach(w => {
                     let base = getBasePoints(w);
                     if (wordCounts[w] > 1) {
-                        score += (base / 2); // Mezzo punto per le doppie
+                        score += (base / 2); // Mezzo punto calcolato in automatico
                     } else {
                         score += base;
                     }
@@ -1164,10 +1156,10 @@
             sorted.forEach(([player, score]) => {
                 let tr = document.createElement('tr');
                 
-                // Evidenzia visivamente le parole scritte dall'utente nella classifica o mostra il dettaglio
                 let playerWords = (allWordsData[player] || []).map(w => {
                     let isDup = wordCounts[w] > 1;
-                    return `<span class="word-badge ${isDup ? 'duplicate' : ''}" style="font-size:0.7rem; padding:2px 6px; margin:2px; display:inline-block;">${w} (${isDup ? '0.5' : getBasePoints(w)})</span>`;
+                    let pts = isDup ? (getBasePoints(w) / 2) : getBasePoints(w);
+                    return `<span class="word-badge ${isDup ? 'duplicate' : ''}" style="font-size:0.7rem; padding:2px 6px; margin:2px; display:inline-block; cursor:default;">${w} (${pts})</span>`;
                 }).join(' ');
 
                 tr.innerHTML = `<td><b>${player}</b><br><div style="margin-top:4px;">${playerWords}</div></td><td style="vertical-align:top; font-weight:bold; font-size:1.1rem; color:var(--accent);">${score} ptn</td>`;
