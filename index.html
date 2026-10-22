@@ -654,6 +654,7 @@
         let isPaused = false;
         let currentLetters = [];
         let targetEndTime = 0;
+        let startTime = 0;
         let roundCounter = 0;
 
         let peer = null;
@@ -869,7 +870,6 @@
                 conn.playerName = data.name;
                 leaderboard[data.name] = 0;
             } else if (data.type === 'SUBMIT_SCORE') {
-                // L'host riceve i dati del guest ma NON mostra la classifica globale finché l'host non ha confermato i suoi
                 let pName = conn.playerName || data.name;
                 leaderboard[pName] = data.score;
                 confirmedPlayers[pName] = true;
@@ -877,7 +877,6 @@
                 let totalExpected = guestConnections.length + 1;
                 let totalConfirmed = Object.keys(confirmedPlayers).length;
 
-                // Se l'host ha già confermato i suoi punti, aggiorna e propaga a tutti. Altrimenti aspetta che l'host confermi.
                 if (confirmedPlayers[myName]) {
                     broadcastToGuests({ 
                         type: 'UPDATE_LEADERBOARD', 
@@ -894,6 +893,7 @@
         function handleGuestIncomingData(data) {
             if (data.type === 'START_GAME') {
                 config = data.config;
+                startTime = data.startTime;
                 targetEndTime = data.targetEndTime;
                 currentLetters = data.letters;
                 roundCounter = data.roundCounter || 1;
@@ -905,7 +905,6 @@
             } else if (data.type === 'UPDATE_LEADERBOARD') {
                 leaderboard = data.leaderboard;
                 confirmedPlayers = data.confirmedPlayers || confirmedPlayers;
-                // Aggiorna la classifica del guest solo se il guest ha già confermato i suoi punti
                 if (confirmedPlayers[myName]) {
                     updateLeaderboardUILocally(leaderboard, data.confirmedCount, data.totalExpected);
                 }
@@ -929,7 +928,11 @@
         function hostStartMatch() {
             roundCounter++;
             confirmedPlayers = {};
-            targetEndTime = Date.now() + (config.totalSeconds * 1000);
+            
+            // Inizio differito di 2.5 secondi per dare il tempo al pacchetto P2P di arrivare su tutti i telefoni
+            const now = Date.now();
+            startTime = now + 2500;
+            targetEndTime = startTime + (config.totalSeconds * 1000);
             
             let seed = pseudorandomFromSeed(roomCode + "_" + roundCounter);
             let totalCells = config.size * config.size;
@@ -939,6 +942,7 @@
             broadcastToGuests({
                 type: 'START_GAME',
                 config: config,
+                startTime: startTime,
                 targetEndTime: targetEndTime,
                 letters: currentLetters,
                 roundCounter: roundCounter
@@ -961,10 +965,10 @@
                 document.getElementById('hostPauseBtn').style.display = 'none';
             }
 
-            startRoundDirect(targetEndTime);
+            startSynchronizedCountdown();
         }
 
-        function startRoundDirect(endTimestamp) {
+        function startSynchronizedCountdown() {
             myWords = [];
             renderWordList();
             document.getElementById('wordInput').disabled = false;
@@ -975,25 +979,31 @@
 
             document.getElementById('lidTitle').textContent = `Round ${roundCounter} in arrivo...`;
             document.getElementById('countdownNum').style.display = 'block';
-            document.getElementById('countdownNum').textContent = "3";
+            document.getElementById('countdownNum').textContent = "Pronti...";
 
-            setTimeout(() => {
-                document.getElementById('lidTitle').textContent = "La partita inizia tra:";
-                let count = 3;
-                document.getElementById('countdownNum').textContent = count;
+            // Attesa sincronizzata dell'orario esatto di partenza globale
+            const syncCheck = setInterval(() => {
+                const now = Date.now();
+                if (now >= startTime) {
+                    clearInterval(syncCheck);
+                    
+                    document.getElementById('lidTitle').textContent = "La partita inizia tra:";
+                    let count = 3;
+                    document.getElementById('countdownNum').textContent = count;
 
-                let cInterval = setInterval(() => {
-                    count--;
-                    if (count > 0) {
-                        document.getElementById('countdownNum').textContent = count;
-                    } else {
-                        clearInterval(cInterval);
-                        lid.classList.add('open');
-                        renderGridFromLetters(currentLetters);
-                        startTimerWithTarget(endTimestamp);
-                    }
-                }, 1000);
-            }, 800);
+                    let cInterval = setInterval(() => {
+                        count--;
+                        if (count > 0) {
+                            document.getElementById('countdownNum').textContent = count;
+                        } else {
+                            clearInterval(cInterval);
+                            lid.classList.add('open');
+                            renderGridFromLetters(currentLetters);
+                            startTimerWithTarget(targetEndTime);
+                        }
+                    }, 1000);
+                }
+            }, 50);
         }
 
         function renderGridFromLetters(letters) {
@@ -1181,11 +1191,9 @@
         function confirmRoundScore() {
             let roundPoints = parseFloat(document.getElementById('roundScoreDisplay').textContent);
             
-            // Somma corretta dei punti del round al proprio totale
             leaderboard[myName] = (leaderboard[myName] || 0) + roundPoints;
             confirmedPlayers[myName] = true;
 
-            // Disabilita il pulsante solo localmente
             document.getElementById('confirmScoreBtn').disabled = true;
             document.getElementById('reviewModal').style.display = 'none';
 
@@ -1202,7 +1210,6 @@
                     totalExpected: totalExpected 
                 });
             } else {
-                // Il guest invia i dati all'host ma resta in attesa sulla propria classifica locale
                 hostConnection.send({ type: 'SUBMIT_SCORE', name: myName, score: leaderboard[myName] });
                 updateLeaderboardUILocally(leaderboard, totalConfirmed, totalExpected);
             }
@@ -1259,6 +1266,7 @@
                 roomCode: roomCode,
                 myName: myName,
                 config: config,
+                startTime: startTime,
                 targetEndTime: targetEndTime,
                 currentLetters: currentLetters,
                 leaderboard: leaderboard,
@@ -1280,6 +1288,7 @@
                 roomCode = state.roomCode;
                 myName = state.myName || 'Giocatore';
                 config = state.config || config;
+                startTime = state.startTime || 0;
                 targetEndTime = state.targetEndTime || 0;
                 currentLetters = state.currentLetters || [];
                 leaderboard = state.leaderboard || {};
@@ -1294,7 +1303,6 @@
                         if (state.step === 'game' && targetEndTime > Date.now()) {
                             enterGameAreaFromRemote();
                         } else if (state.step === 'review' || (state.step === 'game' && targetEndTime <= Date.now())) {
-                            // Se ricarica durante la revisione
                             document.getElementById('gameArea').style.display = 'flex';
                             endRound();
                         } else {
@@ -1350,7 +1358,8 @@
                     } else {
                         clearInterval(cInterval);
                         lid.classList.add('open');
-                        targetEndTime = Date.now() + (config.totalSeconds * 1000);
+                        startTime = Date.now();
+                        targetEndTime = startTime + (config.totalSeconds * 1000);
                         saveToLocalStorage('game');
                         startTimerWithTarget(targetEndTime);
                     }
