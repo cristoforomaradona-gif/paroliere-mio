@@ -156,6 +156,7 @@
         }
 
         .btn-primary:active { background-color: var(--accent-hover); }
+        .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
 
         .btn-secondary {
             width: 100%;
@@ -573,7 +574,7 @@
                 <div style="text-align: center; margin-bottom: 12px; font-size:0.95rem;">
                     Punti Round: <b id="roundScoreDisplay" style="color:var(--accent); font-size:1.1rem;">0</b>
                 </div>
-                <button class="btn-primary" onclick="confirmRoundScore()">CONFERMA E INVIA PUNTEGGIO</button>
+                <button id="confirmScoreBtn" class="btn-primary" onclick="confirmRoundScore()">CONFERMA E INVIA PUNTEGGIO</button>
             </div>
         </div>
     </div>
@@ -593,7 +594,11 @@
                 <tbody id="leaderboardBody"></tbody>
             </table>
 
-            <button id="nextRoundBtn" class="btn-primary" style="margin-bottom: 8px; display:none;" onclick="hostNextRound()">PROSSIMO ROUND 🔄</button>
+            <p id="waitingNotice" style="font-size:0.75rem; color:var(--text-muted); text-align:center; margin-bottom:8px; display:none;">
+                In attesa che tutti i giocatori confermino i punteggi...
+            </p>
+
+            <button id="nextRoundBtn" class="btn-primary" style="margin-bottom: 8px; display:none;" onclick="hostNextRound()" disabled>IN ATTESA DEGLI ALTRI...</button>
             <button class="btn-secondary btn-danger" onclick="terminateMatchForAll()">Esci / Termina Stanza</button>
         </div>
     </div>
@@ -622,6 +627,7 @@
         let roomCode = "";
         let myWords = [];
         let leaderboard = {};
+        let confirmedPlayers = {}; // Traccia chi ha confermato i punti
         let timerInterval = null;
         let timeLeft = 0;
         let isPaused = false;
@@ -842,8 +848,15 @@
                 conn.playerName = data.name;
                 leaderboard[data.name] = 0;
             } else if (data.type === 'SUBMIT_SCORE') {
-                leaderboard[data.name] = data.score;
-                broadcastToGuests({ type: 'UPDATE_LEADERBOARD', leaderboard: leaderboard });
+                leaderboard[conn.playerName || data.name] = data.score;
+                confirmedPlayers[conn.playerName || data.name] = true;
+
+                // Controlla se tutti (host + tutti i guest) hanno confermato
+                let totalExpected = guestConnections.length + 1;
+                let totalConfirmed = Object.keys(confirmedPlayers).length;
+
+                broadcastToGuests({ type: 'UPDATE_LEADERBOARD', leaderboard: leaderboard, confirmedCount: totalConfirmed, totalExpected: totalExpected });
+                updateLeaderboardUILocally(leaderboard, totalConfirmed, totalExpected);
             }
         }
 
@@ -853,13 +866,14 @@
                 targetEndTime = data.targetEndTime;
                 currentLetters = data.letters;
                 roundCounter = data.roundCounter || 1;
+                confirmedPlayers = {};
                 saveToLocalStorage('game');
                 enterGameAreaFromRemote();
             } else if (data.type === 'PAUSE_GAME') {
                 triggerRemotePause(data.isPaused);
             } else if (data.type === 'UPDATE_LEADERBOARD') {
                 leaderboard = data.leaderboard;
-                showLeaderboardModal();
+                updateLeaderboardUILocally(leaderboard, data.confirmedCount, data.totalExpected);
             } else if (data.type === 'TERMINATE_ROOM') {
                 showToast("L'Host ha terminato la partita.");
                 resetAll();
@@ -879,6 +893,7 @@
 
         function hostStartMatch() {
             roundCounter++;
+            confirmedPlayers = {};
             targetEndTime = Date.now() + (config.totalSeconds * 1000);
             
             let seed = pseudorandomFromSeed(roomCode + "_" + roundCounter);
@@ -923,7 +938,6 @@
             lid.style.display = 'flex';
             lid.classList.remove('open');
 
-            // Conto alla rovescia 3, 2, 1 sincronizzato prima di togliere il coperchio
             document.getElementById('lidTitle').textContent = `Round ${roundCounter} in arrivo...`;
             document.getElementById('countdownNum').style.display = 'none';
 
@@ -1078,6 +1092,7 @@
             }
 
             renderReviewList();
+            document.getElementById('confirmScoreBtn').disabled = false;
         }
 
         function getBasePoints(w) {
@@ -1127,40 +1142,61 @@
         function confirmRoundScore() {
             let roundPoints = parseFloat(document.getElementById('roundScoreDisplay').textContent);
             leaderboard[myName] = (leaderboard[myName] || 0) + roundPoints;
+            confirmedPlayers[myName] = true;
 
+            document.getElementById('confirmScoreBtn').disabled = true;
             document.getElementById('reviewModal').style.display = 'none';
 
+            let totalExpected = guestConnections.length + 1;
+            let totalConfirmed = Object.keys(confirmedPlayers).length;
+
             if (role === 'host') {
-                showLeaderboardModal();
-                broadcastToGuests({ type: 'UPDATE_LEADERBOARD', leaderboard: leaderboard });
+                updateLeaderboardUILocally(leaderboard, totalConfirmed, totalExpected);
+                broadcastToGuests({ type: 'UPDATE_LEADERBOARD', leaderboard: leaderboard, confirmedCount: totalConfirmed, totalExpected: totalExpected });
             } else {
                 hostConnection.send({ type: 'SUBMIT_SCORE', name: myName, score: leaderboard[myName] });
-                showToast("Punteggio inviato! In attesa dell'Host...");
+                showLeaderboardModal();
+                updateLeaderboardUILocally(leaderboard, totalConfirmed, totalExpected);
             }
         }
 
-        function showLeaderboardModal() {
+        function updateLeaderboardUILocally(lb, confirmedCount, totalExpected) {
             let tbody = document.getElementById('leaderboardBody');
             tbody.innerHTML = '';
 
-            let sorted = Object.entries(leaderboard).sort((a, b) => b[1] - a[1]);
+            let sorted = Object.entries(lb).sort((a, b) => b[1] - a[1]);
             sorted.forEach(([player, score]) => {
                 let tr = document.createElement('tr');
-                tr.innerHTML = `<td><b>${player}</b></td><td>${score} ptn</td>`;
+                tr.innerHTML = `<td><b>${player}</b> ${confirmedPlayers[player] ? '✅' : '⏳'}</td><td>${score} ptn</td>`;
                 tbody.appendChild(tr);
             });
 
             document.getElementById('leaderboardModal').style.display = 'flex';
-            if (role === 'host') {
-                document.getElementById('nextRoundBtn').style.display = 'block';
-                document.getElementById('nextRoundBtn').textContent = "AVVIA PROSSIMO ROUND 🔄";
+
+            let nextBtn = document.getElementById('nextRoundBtn');
+            let waitingNotice = document.getElementById('waitingNotice');
+            nextBtn.style.display = 'block';
+            waitingNotice.style.display = 'block';
+
+            if (confirmedCount >= totalExpected) {
+                waitingNotice.textContent = "Tutti i giocatori hanno confermato!";
+                if (role === 'host') {
+                    nextBtn.disabled = false;
+                    nextBtn.textContent = "AVVIA PROSSIMO ROUND 🔄";
+                } else {
+                    nextBtn.disabled = true;
+                    nextBtn.textContent = "In attesa che l'Host avvii il nuovo round...";
+                }
             } else {
-                // Messaggio per gli ospiti in classifica
-                let nextBtnNotice = document.getElementById('nextRoundBtn');
-                nextBtnNotice.style.display = 'block';
-                nextBtnNotice.disabled = true;
-                nextBtnNotice.textContent = "In attesa che l'Host avvii il nuovo round...";
+                waitingNotice.textContent = `In attesa conferme: ${confirmedCount} su ${totalExpected}`;
+                nextBtn.disabled = true;
+                nextBtn.textContent = role === 'host' ? "ATTENDI TUTTI I GIOCATORI..." : "In attesa che l'Host avvii il nuovo round...";
             }
+        }
+
+        function showLeaderboardModal() {
+            // Mostra la modale in sola lettura per gli ospiti in attesa
+            document.getElementById('leaderboardModal').style.display = 'flex';
         }
 
         function hostNextRound() {
