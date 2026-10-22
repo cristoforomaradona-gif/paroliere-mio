@@ -869,13 +869,24 @@
                 conn.playerName = data.name;
                 leaderboard[data.name] = 0;
             } else if (data.type === 'SUBMIT_SCORE') {
-                leaderboard[conn.playerName || data.name] = data.score;
-                confirmedPlayers[conn.playerName || data.name] = true;
+                // L'Host registra il punteggio e la conferma del guest in modo indipendente
+                let pName = conn.playerName || data.name;
+                leaderboard[pName] = data.score;
+                confirmedPlayers[pName] = true;
 
                 let totalExpected = guestConnections.length + 1;
                 let totalConfirmed = Object.keys(confirmedPlayers).length;
 
-                broadcastToGuests({ type: 'UPDATE_LEADERBOARD', leaderboard: leaderboard, confirmedCount: totalConfirmed, totalExpected: totalExpected });
+                // Invia la classifica aggiornata e lo stato delle conferme a tutti i guest
+                broadcastToGuests({ 
+                    type: 'UPDATE_LEADERBOARD', 
+                    leaderboard: leaderboard, 
+                    confirmedPlayers: confirmedPlayers,
+                    confirmedCount: totalConfirmed, 
+                    totalExpected: totalExpected 
+                });
+                
+                // Aggiorna la schermata dell'host localmente senza forzare la chiusura altrui
                 updateLeaderboardUILocally(leaderboard, totalConfirmed, totalExpected);
             }
         }
@@ -893,6 +904,7 @@
                 triggerRemotePause(data.isPaused);
             } else if (data.type === 'UPDATE_LEADERBOARD') {
                 leaderboard = data.leaderboard;
+                confirmedPlayers = data.confirmedPlayers || confirmedPlayers;
                 updateLeaderboardUILocally(leaderboard, data.confirmedCount, data.totalExpected);
             } else if (data.type === 'TERMINATE_ROOM') {
                 showToast("L'Host ha terminato la partita.");
@@ -998,7 +1010,6 @@
             targetEndTime = endTimestamp;
             clearInterval(timerInterval);
 
-            // Calcolo immediato iniziale per azzerare qualsiasi ritardo visivo
             const now = Date.now();
             timeLeft = Math.max(0, Math.ceil((targetEndTime - now) / 1000));
             updateTimerDisplay();
@@ -1018,7 +1029,7 @@
                 } else {
                     targetEndTime += 1000;
                 }
-            }, 200); // Controlla 5 volte al secondo per la massima precisione al millisecondo
+            }, 200);
         }
 
         function pseudorandomFromSeed(str) {
@@ -1166,9 +1177,12 @@
 
         function confirmRoundScore() {
             let roundPoints = parseFloat(document.getElementById('roundScoreDisplay').textContent);
+            
+            // Somma corretta dei punti del round al proprio totale
             leaderboard[myName] = (leaderboard[myName] || 0) + roundPoints;
             confirmedPlayers[myName] = true;
 
+            // Disabilita solo il pulsante sul proprio dispositivo
             document.getElementById('confirmScoreBtn').disabled = true;
             document.getElementById('reviewModal').style.display = 'none';
 
@@ -1177,8 +1191,15 @@
 
             if (role === 'host') {
                 updateLeaderboardUILocally(leaderboard, totalConfirmed, totalExpected);
-                broadcastToGuests({ type: 'UPDATE_LEADERBOARD', leaderboard: leaderboard, confirmedCount: totalConfirmed, totalExpected: totalExpected });
+                broadcastToGuests({ 
+                    type: 'UPDATE_LEADERBOARD', 
+                    leaderboard: leaderboard, 
+                    confirmedPlayers: confirmedPlayers,
+                    confirmedCount: totalConfirmed, 
+                    totalExpected: totalExpected 
+                });
             } else {
+                // Il guest invia i suoi dati all'host in modo indipendente
                 hostConnection.send({ type: 'SUBMIT_SCORE', name: myName, score: leaderboard[myName] });
                 showLeaderboardModal();
                 updateLeaderboardUILocally(leaderboard, totalConfirmed, totalExpected);
