@@ -358,8 +358,8 @@
             cursor: pointer;
         }
 
-        .word-badge.deleted { text-decoration: line-through; opacity: 0.3; border-color: var(--danger); }
-        .word-badge.duplicate { border-color: var(--warning); color: var(--warning); background-color: rgba(181, 159, 59, 0.15); }
+        .word-badge.half { border-color: var(--warning); color: var(--warning); background-color: rgba(181, 159, 59, 0.15); }
+        .word-badge.deleted { text-decoration: line-through; opacity: 0.3; border-color: var(--danger); color: var(--danger); }
 
         .review-legend {
             display: flex;
@@ -368,7 +368,7 @@
             padding: 6px;
             border-radius: 8px;
             margin-bottom: 8px;
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             font-weight: bold;
         }
 
@@ -506,7 +506,7 @@
             </div>
 
             <div id="guestLobbyNotice" style="display:none; font-size:0.85rem; color:var(--text-muted); margin-bottom:10px;">
-                Connesso an Host! In attesa che avvii la partita...
+                Connesso all'Host! In attesa che avvii la partita...
             </div>
 
             <button id="startMatchBtn" class="btn-primary" onclick="hostStartMatch()" style="display:none;">AVVIA PARTITA PER TUTTI 🚀</button>
@@ -557,9 +557,11 @@
         <div class="modal-card">
             <h2>Tempo Scaduto!</h2>
             
+            <!-- LEGENDA TAP -->
             <div class="review-legend">
-                <span style="color: var(--accent);">🟢 Valida (Pieni)</span>
-                <span style="color: var(--danger);">❌ Annullata (Tap per escludere)</span>
+                <span style="color: var(--accent);">🟢 Pieni</span>
+                <span style="color: var(--warning);">🟡 1 Tap (1/2 Ptn)</span>
+                <span style="color: var(--danger);">❌ 2 Tap (Annullata)</span>
             </div>
 
             <div class="grid-wrapper" style="padding: 6px; margin-bottom: 8px;">
@@ -569,9 +571,9 @@
             <div id="multiReviewSection">
                 <div id="reviewWordList" class="word-list" style="max-height: 140px; margin-bottom: 8px;"></div>
                 <div style="text-align: center; margin-bottom: 12px; font-size:0.95rem;">
-                    Punti Base Round: <b id="roundScoreDisplay" style="color:var(--accent); font-size:1.1rem;">0</b>
+                    Punti Round: <b id="roundScoreDisplay" style="color:var(--accent); font-size:1.1rem;">0</b>
                 </div>
-                <button class="btn-primary" onclick="confirmRoundScore()">CONFERMA E INVIA PAROLE</button>
+                <button class="btn-primary" onclick="confirmRoundScore()">CONFERMA E INVIA PUNTEGGIO</button>
             </div>
         </div>
     </div>
@@ -619,7 +621,6 @@
         let myName = "Giocatore";
         let roomCode = "";
         let myWords = [];
-        let allPlayersWords = {};
         let leaderboard = {};
         let timerInterval = null;
         let timeLeft = 0;
@@ -839,13 +840,9 @@
             if (data.type === 'JOIN') {
                 conn.playerName = data.name;
                 leaderboard[data.name] = 0;
-            } else if (data.type === 'SUBMIT_WORDS') {
-                allPlayersWords[data.name] = data.words;
-                
-                if (Object.keys(allPlayersWords).length === guestConnections.length + 1) {
-                    broadcastToGuests({ type: 'CALCULATE_LEADERBOARD', allWords: allPlayersWords });
-                    processAndShowLeaderboard(allPlayersWords);
-                }
+            } else if (data.type === 'SUBMIT_SCORE') {
+                leaderboard[data.name] = data.score;
+                broadcastToGuests({ type: 'UPDATE_LEADERBOARD', leaderboard: leaderboard });
             }
         }
 
@@ -858,9 +855,6 @@
                 enterGameAreaFromRemote();
             } else if (data.type === 'PAUSE_GAME') {
                 triggerRemotePause(data.isPaused);
-            } else if (data.type === 'CALCULATE_LEADERBOARD') {
-                allPlayersWords = data.allWords;
-                processAndShowLeaderboard(allPlayersWords);
             } else if (data.type === 'UPDATE_LEADERBOARD') {
                 leaderboard = data.leaderboard;
                 showLeaderboardModal();
@@ -883,12 +877,11 @@
 
         function hostStartMatch() {
             targetEndTime = Date.now() + (config.totalSeconds * 1000);
-            allPlayersWords = {};
             
             let seed = pseudorandomFromSeed(roomCode);
             let totalCells = config.size * config.size;
-            let shuffledDice = [...realDiceItalian].sort(() => seed() - 0.5).slice(0, totalCells);
-            currentLetters = shuffledDice.map(die => die[Math.floor(seed() * die.length)]).sort(() => seed() - 0.5);
+            let shuffledDice = [...realDiceItalian].sort(() => seed - 0.5).slice(0, totalCells);
+            currentLetters = shuffledDice.map(die => die[Math.floor(seed * die.length)]).sort(() => seed - 0.5);
 
             broadcastToGuests({
                 type: 'START_GAME',
@@ -992,7 +985,8 @@
                 triggerVibration([50, 50, 50]);
                 playAudioTone(250, 0.15);
             } else {
-                myWords.push({ word: w, deleted: false });
+                // state: 'full', 'half', 'deleted'
+                myWords.push({ word: w, state: 'full' });
                 triggerVibration(40);
                 playAudioTone(800, 0.08);
                 renderWordList();
@@ -1081,15 +1075,23 @@
 
             myWords.forEach((item) => {
                 let badge = document.createElement('div');
-                badge.className = `word-badge ${item.deleted ? 'deleted' : ''}`;
+                badge.className = `word-badge ${item.state}`;
                 
                 let basePoints = getBasePoints(item.word);
-                let currentPoints = item.deleted ? 0 : basePoints;
+                let currentPoints = 0;
+                if (item.state === 'full') currentPoints = basePoints;
+                else if (item.state === 'half') currentPoints = basePoints / 2;
+                else if (item.state === 'deleted') currentPoints = 0;
+
                 totalRoundScore += currentPoints;
 
                 badge.textContent = `${item.word} (${currentPoints} ptn)`;
+                
+                // Cliccando cicla tra: full -> half -> deleted -> full
                 badge.onclick = () => {
-                    item.deleted = !item.deleted;
+                    if (item.state === 'full') item.state = 'half';
+                    else if (item.state === 'half') item.state = 'deleted';
+                    else item.state = 'full';
                     renderReviewList();
                 };
                 container.appendChild(badge);
@@ -1099,70 +1101,28 @@
         }
 
         function confirmRoundScore() {
-            let cleanWords = myWords.filter(item => !item.deleted).map(item => item.word);
+            let roundPoints = parseFloat(document.getElementById('roundScoreDisplay').textContent);
+            leaderboard[myName] = (leaderboard[myName] || 0) + roundPoints;
+
             document.getElementById('reviewModal').style.display = 'none';
 
             if (role === 'host') {
-                allPlayersWords[myName] = cleanWords;
-                if (Object.keys(allPlayersWords).length === guestConnections.length + 1) {
-                    broadcastToGuests({ type: 'CALCULATE_LEADERBOARD', allWords: allPlayersWords });
-                    processAndShowLeaderboard(allPlayersWords);
-                } else {
-                    showToast("In attesa degli altri giocatori...");
-                }
-            } else {
-                hostConnection.send({ type: 'SUBMIT_WORDS', name: myName, words: cleanWords });
-                showToast("Parole inviate! In attesa degli altri...");
-            }
-        }
-
-        // --- CALCOLO AUTOMATICO MEZZI PUNTI E DUPLICATI ---
-        function processAndShowLeaderboard(allWordsData) {
-            let wordCounts = {};
-
-            Object.values(allWordsData).forEach(wordList => {
-                let uniqueWords = [...new Set(wordList)];
-                uniqueWords.forEach(w => {
-                    wordCounts[w] = (wordCounts[w] || 0) + 1;
-                });
-            });
-
-            leaderboard = {};
-            Object.keys(allWordsData).forEach(player => {
-                let score = 0;
-                allWordsData[player].forEach(w => {
-                    let base = getBasePoints(w);
-                    if (wordCounts[w] > 1) {
-                        score += (base / 2); // Mezzo punto calcolato in automatico
-                    } else {
-                        score += base;
-                    }
-                });
-                leaderboard[player] = score;
-            });
-
-            if (role === 'host') {
+                showLeaderboardModal();
                 broadcastToGuests({ type: 'UPDATE_LEADERBOARD', leaderboard: leaderboard });
+            } else {
+                hostConnection.send({ type: 'SUBMIT_SCORE', name: myName, score: leaderboard[myName] });
+                showToast("Punteggio inviato all'Host!");
             }
-
-            showLeaderboardModalWithHighlights(allWordsData, wordCounts);
         }
 
-        function showLeaderboardModalWithHighlights(allWordsData, wordCounts) {
+        function showLeaderboardModal() {
             let tbody = document.getElementById('leaderboardBody');
             tbody.innerHTML = '';
 
             let sorted = Object.entries(leaderboard).sort((a, b) => b[1] - a[1]);
             sorted.forEach(([player, score]) => {
                 let tr = document.createElement('tr');
-                
-                let playerWords = (allWordsData[player] || []).map(w => {
-                    let isDup = wordCounts[w] > 1;
-                    let pts = isDup ? (getBasePoints(w) / 2) : getBasePoints(w);
-                    return `<span class="word-badge ${isDup ? 'duplicate' : ''}" style="font-size:0.7rem; padding:2px 6px; margin:2px; display:inline-block; cursor:default;">${w} (${pts})</span>`;
-                }).join(' ');
-
-                tr.innerHTML = `<td><b>${player}</b><br><div style="margin-top:4px;">${playerWords}</div></td><td style="vertical-align:top; font-weight:bold; font-size:1.1rem; color:var(--accent);">${score} ptn</td>`;
+                tr.innerHTML = `<td><b>${player}</b></td><td>${score} ptn</td>`;
                 tbody.appendChild(tr);
             });
 
