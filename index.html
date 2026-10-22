@@ -259,10 +259,11 @@
             transition: transform 0.4s ease;
         }
 
+        /* COPERCHIO TOTALMENTE OPACO E SICURO */
         .lid {
             position: absolute;
             inset: 0;
-            background: linear-gradient(135deg, #2a2a2d 0%, #151517 100%);
+            background-color: #121213;
             border: 2px solid var(--border);
             border-radius: 12px;
             display: flex;
@@ -540,7 +541,7 @@
 
             <div id="digitalNotepad" style="width: 100%;">
                 <div class="word-input-container">
-                    <input type="text" id="wordInput" class="input-text" placeholder="Scrivi parola..." autocomplete="off" capitalize="characters">
+                    <input type="text" id="wordInput" class="input-text" placeholder="Scrivi parola..." autocomplete="off">
                     <button class="btn-primary" style="width: auto; padding: 0 16px;" onclick="addWord()">+ Add</button>
                 </div>
 
@@ -928,7 +929,6 @@
                         endRound();
                     }
                 } else {
-                    // Mantiene allineato il target durante la pausa
                     targetEndTime += 1000;
                 }
             }, 1000);
