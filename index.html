@@ -288,6 +288,25 @@
             pointer-events: none;
         }
 
+        .lid-content {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .lid-title {
+            font-weight: bold;
+            font-size: 1.1rem;
+            margin-bottom: 12px;
+            color: var(--text-main);
+        }
+
+        .countdown-num {
+            font-size: 3.5rem !important;
+            font-weight: 900;
+            color: var(--accent);
+            line-height: 1;
+        }
+
         .pause-overlay {
             position: absolute;
             top: 0; left: 0;
@@ -528,9 +547,9 @@
 
             <div id="gridWrapper" class="grid-wrapper">
                 <div id="lid" class="lid" style="display:none;">
-                    <div style="text-align:center;">
-                        <div id="lidTitle" style="font-weight:bold; font-size:1rem; margin-bottom:5px;">In attesa dell'Host...</div>
-                        <div id="countdownNum" style="font-size:2rem; font-weight:900; color:var(--accent);">Sincronizzato</div>
+                    <div class="lid-content">
+                        <div id="lidTitle" class="lid-title">In attesa dell'Host...</div>
+                        <div id="countdownNum" class="countdown-num">3</div>
                     </div>
                 </div>
 
@@ -627,13 +646,13 @@
         let roomCode = "";
         let myWords = [];
         let leaderboard = {};
-        let confirmedPlayers = {}; // Traccia chi ha confermato i punti
+        let confirmedPlayers = {};
         let timerInterval = null;
         let timeLeft = 0;
         let isPaused = false;
         let currentLetters = [];
         let targetEndTime = 0;
-        let roundCounter = 1;
+        let roundCounter = 0; // Parte da 0 così il primo round sarà correttamente il Round 1
 
         let peer = null;
         let hostConnection = null;
@@ -851,7 +870,6 @@
                 leaderboard[conn.playerName || data.name] = data.score;
                 confirmedPlayers[conn.playerName || data.name] = true;
 
-                // Controlla se tutti (host + tutti i guest) hanno confermato
                 let totalExpected = guestConnections.length + 1;
                 let totalConfirmed = Object.keys(confirmedPlayers).length;
 
@@ -892,7 +910,7 @@
         }
 
         function hostStartMatch() {
-            roundCounter++;
+            roundCounter++; // Incrementa correttamente a 1 per il primo round
             confirmedPlayers = {};
             targetEndTime = Date.now() + (config.totalSeconds * 1000);
             
@@ -939,10 +957,10 @@
             lid.classList.remove('open');
 
             document.getElementById('lidTitle').textContent = `Round ${roundCounter} in arrivo...`;
-            document.getElementById('countdownNum').style.display = 'none';
+            document.getElementById('countdownNum').style.display = 'block';
+            document.getElementById('countdownNum').textContent = "3";
 
             setTimeout(() => {
-                document.getElementById('countdownNum').style.display = 'block';
                 document.getElementById('lidTitle').textContent = "La partita inizia tra:";
                 let count = 3;
                 document.getElementById('countdownNum').textContent = count;
@@ -1195,7 +1213,6 @@
         }
 
         function showLeaderboardModal() {
-            // Mostra la modale in sola lettura per gli ospiti in attesa
             document.getElementById('leaderboardModal').style.display = 'flex';
         }
 
@@ -1239,7 +1256,7 @@
                 targetEndTime = state.targetEndTime || 0;
                 currentLetters = state.currentLetters || [];
                 leaderboard = state.leaderboard || {};
-                roundCounter = state.roundCounter || 1;
+                roundCounter = state.roundCounter || 0;
 
                 if (role === 'host') {
                     document.getElementById('setupPanel').style.display = 'none';
@@ -1273,11 +1290,12 @@
         }
 
         function startTableRound() {
+            roundCounter++; // Incrementa per il singolo giocatore
             let lid = document.getElementById('lid');
             lid.classList.remove('open');
             lid.style.display = 'flex';
             lid.classList.add('shaking');
-            document.getElementById('lidTitle').textContent = "Mescolando i dadi...";
+            document.getElementById('lidTitle').textContent = `Round ${roundCounter} - Mescolando i dadi...`;
             document.getElementById('countdownNum').style.display = 'none';
 
             let seed = Math.random();
