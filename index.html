@@ -260,6 +260,7 @@
             border: 1px solid var(--border);
             box-shadow: 0 8px 20px rgba(0,0,0,0.4);
             width: 100%;
+            min-height: 280px;
             transition: transform 0.4s ease;
             overflow: hidden;
         }
@@ -291,17 +292,18 @@
         .lid-content {
             text-align: center;
             padding: 20px;
+            width: 100%;
         }
 
         .lid-title {
             font-weight: bold;
             font-size: 1.1rem;
-            margin-bottom: 12px;
+            margin-bottom: 15px;
             color: var(--text-main);
         }
 
         .countdown-num {
-            font-size: 3.5rem !important;
+            font-size: 4rem !important;
             font-weight: 900;
             color: var(--accent);
             line-height: 1;
@@ -652,7 +654,7 @@
         let isPaused = false;
         let currentLetters = [];
         let targetEndTime = 0;
-        let roundCounter = 0; // Parte da 0 così il primo round sarà correttamente il Round 1
+        let roundCounter = 0;
 
         let peer = null;
         let hostConnection = null;
@@ -910,7 +912,7 @@
         }
 
         function hostStartMatch() {
-            roundCounter++; // Incrementa correttamente a 1 per il primo round
+            roundCounter++;
             confirmedPlayers = {};
             targetEndTime = Date.now() + (config.totalSeconds * 1000);
             
@@ -1290,7 +1292,7 @@
         }
 
         function startTableRound() {
-            roundCounter++; // Incrementa per il singolo giocatore
+            roundCounter++;
             let lid = document.getElementById('lid');
             lid.classList.remove('open');
             lid.style.display = 'flex';
