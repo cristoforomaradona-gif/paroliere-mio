@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Il Paroliere Multiplayer</title>
+    <title>Il Paroliere Multiplayer P2P</title>
+    <!-- Libreria PeerJS per la connessione P2P diretta tra dispositivi -->
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
     <style>
         :root {
             --bg-color: #121213;
@@ -260,7 +262,6 @@
             overflow: hidden;
         }
 
-        /* COPERCHIO TOTALMENTE OPACO SENZA TRASPARENZE */
         .lid {
             position: absolute;
             top: 0;
@@ -287,15 +288,6 @@
             pointer-events: none;
         }
 
-        .lid.shaking { animation: shake 0.1s infinite; }
-
-        @keyframes shake {
-            0% { transform: translate(1px, 1px); }
-            50% { transform: translate(-2px, -1px); }
-            100% { transform: translate(1px, 2px); }
-        }
-
-        /* PAUSA COMPLETAMENTE OPACA */
         .pause-overlay {
             position: absolute;
             top: 0;
@@ -412,17 +404,6 @@
         }
 
         .leaderboard-table th { color: var(--text-muted); }
-
-        .manual-score-input {
-            width: 60px;
-            padding: 6px;
-            background: var(--panel-color);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            color: var(--text-main);
-            text-align: center;
-            font-weight: bold;
-        }
     </style>
 </head>
 <body>
@@ -431,7 +412,7 @@
 
     <header>
         <h1>Il Paroliere</h1>
-        <div class="subtitle">Multiplayer Mobile da Tavolo</div>
+        <div class="subtitle">Multiplayer P2P in Tempo Reale</div>
     </header>
 
     <div class="main-container">
@@ -447,7 +428,7 @@
 
             <div id="singlePlayersGroup" class="control-group" style="display:none;">
                 <label>Nomi Giocatori (Separati da virgola)</label>
-                <input type="text" id="playersListInput" class="input-text" placeholder="Es. Marco, Anna, Luca" value="Giocatore 1, Giocatore 2">
+                <input type="text" id="playersListInput" class="input-text" placeholder="Es. Marco, Anna" value="Giocatore 1, Giocatore 2">
             </div>
 
             <div id="playerNameGroup" class="control-group">
@@ -508,18 +489,18 @@
             <div id="codeDisplay" class="code-box">----</div>
 
             <button class="btn-secondary" style="margin-bottom: 8px;" onclick="shareRoomLink()">📲 Condividi Link Stanza</button>
-            <button class="btn-secondary btn-danger" style="margin-bottom: 12px;" onclick="resetAll()">⚙️ Indietro / Cambia Impostazioni</button>
+            <button class="btn-secondary btn-danger" style="margin-bottom: 12px;" onclick="resetAll()">⚙️ Indietro</button>
 
             <div id="hostLobbyNotice" style="display:none; font-size:0.85rem; color:var(--text-muted); margin-bottom:10px;">
-                Quando tutti sono pronti, premi il pulsante per far partire la sfida!
+                Giocatori connessi: <b id="connectedCount" style="color:var(--accent);">1</b><br>
+                Quando siete pronti, l'Host può avviare la sfida!
             </div>
 
             <div id="guestLobbyNotice" style="display:none; font-size:0.85rem; color:var(--text-muted); margin-bottom:10px;">
-                In attesa che l'Host dia il via alla partita...
+                Connesso all'Host! In attesa che avvii la partita...
             </div>
 
-            <button id="startMatchBtn" class="btn-primary" onclick="startCountdownAndPlay()" style="display:none;">AVVIA PARTITA PER TUTTI 🚀</button>
-            <button id="guestReadyBtn" class="btn-primary" onclick="startCountdownAndPlay()" style="display:none;">SONO PRONTO (AVVIA TIMER)</button>
+            <button id="startMatchBtn" class="btn-primary" onclick="hostStartMatch()" style="display:none;">AVVIA PARTITA PER TUTTI 🚀</button>
         </div>
 
         <!-- AREA GIOCO -->
@@ -530,22 +511,23 @@
                     <button class="tool-btn" id="rotateBtn" style="display:none;" onclick="rotateGrid()">🔄 Ruota</button>
                     <button class="tool-btn" id="toggleSoundBtn" onclick="toggleAudio()">🔔</button>
                     <button class="tool-btn" id="toggleVibeBtn" onclick="toggleVibrationSetting()">📳</button>
-                    <button class="tool-btn" id="hostPauseBtn" onclick="togglePause()">⏸️</button>
+                    <button class="tool-btn" id="hostPauseBtn" style="display:none;" onclick="togglePause()">⏸️</button>
                 </div>
             </div>
 
             <div id="gridWrapper" class="grid-wrapper">
                 <div id="lid" class="lid" style="display:none;">
                     <div style="text-align:center;">
-                        <div id="lidTitle" style="font-weight:bold; font-size:1rem; margin-bottom:5px;">Mescolando i dadi...</div>
-                        <div id="countdownNum" style="font-size:3rem; font-weight:900; color:var(--accent);">3</div>
+                        <div id="lidTitle" style="font-weight:bold; font-size:1rem; margin-bottom:5px;">In attesa dell'Host...</div>
+                        <div id="countdownNum" style="font-size:2rem; font-weight:900; color:var(--accent);">Sincronizzato</div>
                     </div>
                 </div>
 
                 <div id="pauseOverlay" class="pause-overlay">
                     <h3 style="color: var(--text-main);">PARTITA IN PAUSA</h3>
-                    <button class="btn-primary" style="width:100%; padding: 12px;" onclick="togglePause()">RIPRENDI GIOCO</button>
-                    <button class="btn-secondary btn-danger" style="width:100%; padding: 12px;" onclick="resetAll()">🗑️ Termina Partita</button>
+                    <button id="resumeMatchBtn" class="btn-primary" style="width:100%; padding: 12px; display:none;" onclick="togglePause()">RIPRENDI GIOCO</button>
+                    <p id="guestPauseMsg" style="font-size:0.85rem; color: var(--text-muted);">L'Host ha messo in pausa la partita.</p>
+                    <button class="btn-secondary btn-danger" id="terminateMatchBtn" style="width:100%; padding: 12px; display:none;" onclick="resetAll()">🗑️ Termina Partita</button>
                 </div>
                 <div id="diceGrid" class="grid grid-5"></div>
             </div>
@@ -579,21 +561,7 @@
                 <div style="text-align: center; margin-bottom: 12px; font-size:0.95rem;">
                     Punti Round: <b id="roundScoreDisplay" style="color:var(--accent); font-size:1.1rem;">0</b>
                 </div>
-                <button class="btn-primary" onclick="confirmRoundScore()">CONFERMA E CLASSIFICA</button>
-            </div>
-
-            <div id="singleReviewSection" style="display:none;">
-                <p style="font-size:0.8rem; text-align:center; color:var(--text-muted); margin-bottom:8px;">Inserisci i punti fatti in questo round da ciascun giocatore:</p>
-                <table class="leaderboard-table">
-                    <thead>
-                        <tr>
-                            <th>Giocatore</th>
-                            <th style="width: 80px; text-align:center;">Punti Round</th>
-                        </tr>
-                    </thead>
-                    <tbody id="singleScoreInputsBody"></tbody>
-                </table>
-                <button class="btn-primary" onclick="saveSingleRoundScores()">SALVA PUNTI E VEDI CLASSIFICA</button>
+                <button class="btn-primary" onclick="confirmRoundScore()">CONFERMA E INVIA PUNTEGGIO</button>
             </div>
         </div>
     </div>
@@ -613,7 +581,7 @@
                 <tbody id="leaderboardBody"></tbody>
             </table>
 
-            <button class="btn-primary" style="margin-bottom: 8px;" onclick="returnToLobbyNextRound()">PROSSIMO ROUND 🔄</button>
+            <button id="nextRoundBtn" class="btn-primary" style="margin-bottom: 8px; display:none;" onclick="hostNextRound()">PROSSIMO ROUND 🔄</button>
             <button class="btn-secondary btn-danger" onclick="resetAll()">Esci dalla Stanza</button>
         </div>
     </div>
@@ -649,6 +617,11 @@
         let currentLetters = [];
         let targetEndTime = 0;
 
+        // Variabili PeerJS P2P
+        let peer = null;
+        let hostConnection = null; // Usato se sei Guest per parlare con l'Host
+        let guestConnections = []; // Usato se sei Host per parlare con tutti i Guest
+
         window.addEventListener('DOMContentLoaded', () => {
             const urlParams = new URLSearchParams(window.location.search);
             const roomParam = urlParams.get('room');
@@ -656,8 +629,6 @@
                 setRole('guest', document.getElementById('guestRoleBtn'));
                 document.getElementById('roomCodeInput').value = roomParam.toUpperCase();
             }
-
-            loadFromLocalStorage();
         });
 
         document.getElementById('wordInput').addEventListener('keypress', function(e) {
@@ -710,9 +681,7 @@
         }
 
         function triggerVibration(pattern) {
-            if (settings.vibe && "vibrate" in navigator) {
-                navigator.vibrate(pattern);
-            }
+            if (settings.vibe && "vibrate" in navigator) navigator.vibrate(pattern);
         }
 
         function playAudioTone(freq, duration) {
@@ -750,62 +719,31 @@
         }
 
         function shareRoomLink() {
-            let shareUrl = window.location.href;
-            if (window.location.search) {
-                shareUrl = window.location.href.replace(window.location.search, '');
-            }
-            shareUrl = `${shareUrl.split('?')[0]}?room=${roomCode}`;
-
+            let shareUrl = `${window.location.href.split('?')[0]}?room=${roomCode}`;
             if (navigator.share && window.isSecureContext) {
-                navigator.share({
-                    title: 'Il Paroliere - Unisciti alla Stanza',
-                    text: `Gioca con me al Paroliere! Codice Stanza: ${roomCode}`,
-                    url: shareUrl
-                }).catch(() => copyToClipboard(shareUrl));
+                navigator.share({ title: 'Il Paroliere', text: `Unisciti alla mia stanza! Codice: ${roomCode}`, url: shareUrl }).catch(() => copyToClipboard(shareUrl));
             } else {
                 copyToClipboard(shareUrl);
             }
         }
 
         function copyToClipboard(text) {
-            if (navigator.clipboard && window.isSecureContext) {
-                navigator.clipboard.writeText(text).then(() => {
-                    showToast("🔗 Link Stanza Copiato!");
-                }).catch(() => fallbackCopyText(text));
-            } else {
-                fallbackCopyText(text);
-            }
+            navigator.clipboard.writeText(text).then(() => showToast("🔗 Link Stanza Copiato!"));
         }
 
-        function fallbackCopyText(text) {
-            const textArea = document.createElement("textarea");
-            textArea.value = text;
-            textArea.style.position = "fixed";
-            textArea.style.left = "-999999px";
-            document.body.appendChild(textArea);
-            textArea.focus();
-            textArea.select();
-            try {
-                document.execCommand('copy');
-                showToast("🔗 Link Stanza Copiato!");
-            } catch (err) {
-                showToast(`Codice Stanza: ${roomCode}`);
-            }
-            document.body.removeChild(textArea);
-        }
-
+        // --- GESTIONE PEERJS P2P ---
         function initLobby() {
             let min = parseInt(document.getElementById('customMin').value) || 0;
             let sec = parseInt(document.getElementById('customSec').value) || 0;
             config.totalSeconds = (min * 60) + sec;
             if(config.totalSeconds <= 0) config.totalSeconds = 180;
 
+            myName = document.getElementById('playerNameInput').value.trim() || "Giocatore";
+
             if (deviceMode === 'single') {
                 roomCode = generateSeedCode();
                 let namesRaw = document.getElementById('playersListInput').value;
                 let parsedNames = namesRaw.split(',').map(n => n.trim()).filter(n => n.length > 0);
-                if (parsedNames.length === 0) parsedNames = ["Giocatore 1", "Giocatore 2"];
-
                 leaderboard = {};
                 parsedNames.forEach(name => leaderboard[name] = 0);
 
@@ -814,71 +752,116 @@
                 document.getElementById('digitalNotepad').style.display = 'none';
                 document.getElementById('rotateBtn').style.display = 'inline-block';
                 document.getElementById('hostPauseBtn').style.display = 'inline-block';
-                
                 startTableRound();
-            } else {
-                myName = document.getElementById('playerNameInput').value.trim() || "Giocatore";
+                return;
+            }
 
-                if (role === 'host') {
-                    roomCode = generateSeedCode();
+            if (role === 'host') {
+                roomCode = generateSeedCode();
+                leaderboard[myName] = 0;
+
+                // Crea il nodo PeerJS con ID = codice stanza
+                peer = new Peer("paroliere_" + roomCode);
+                
+                peer.on('open', (id) => {
+                    document.getElementById('setupPanel').style.display = 'none';
+                    document.getElementById('lobbyPanel').style.display = 'block';
+                    document.getElementById('codeDisplay').textContent = roomCode;
                     document.getElementById('hostLobbyNotice').style.display = 'block';
                     document.getElementById('startMatchBtn').style.display = 'block';
-                    document.getElementById('guestLobbyNotice').style.display = 'none';
-                    document.getElementById('guestReadyBtn').style.display = 'none';
-                } else {
-                    roomCode = document.getElementById('roomCodeInput').value.trim().toUpperCase();
-                    if (!roomCode) { showToast("Inserisci un codice valido!"); return; }
+                });
 
-                    document.getElementById('hostLobbyNotice').style.display = 'none';
-                    document.getElementById('startMatchBtn').style.display = 'none';
-                    document.getElementById('guestLobbyNotice').style.display = 'block';
-                    document.getElementById('guestReadyBtn').style.display = 'block';
-                }
+                peer.on('connection', (conn) => {
+                    guestConnections.push(conn);
+                    document.getElementById('connectedCount').textContent = guestConnections.length + 1;
 
-                document.getElementById('setupPanel').style.display = 'none';
-                document.getElementById('lobbyPanel').style.display = 'block';
-                document.getElementById('codeDisplay').textContent = roomCode;
+                    conn.on('data', (data) => handleHostIncomingData(data, conn));
+                });
 
-                if (!leaderboard[myName]) leaderboard[myName] = 0;
-                saveToLocalStorage('lobby');
+                peer.on('error', (err) => {
+                    showToast("Errore Stanza: Codice già in uso o rete assente");
+                });
+
+            } else {
+                roomCode = document.getElementById('roomCodeInput').value.trim().toUpperCase();
+                if (!roomCode) { showToast("Inserisci un codice valido!"); return; }
+
+                peer = new Peer(); // Peer ospite casuale
+
+                peer.on('open', (id) => {
+                    hostConnection = peer.connect("paroliere_" + roomCode);
+
+                    hostConnection.on('open', () => {
+                        document.getElementById('setupPanel').style.display = 'none';
+                        document.getElementById('lobbyPanel').style.display = 'block';
+                        document.getElementById('codeDisplay').textContent = roomCode;
+                        document.getElementById('guestLobbyNotice').style.display = 'block';
+                        
+                        // Registrati presso l'host
+                        hostConnection.send({ type: 'JOIN', name: myName });
+                    });
+
+                    hostConnection.on('data', (data) => handleGuestIncomingData(data));
+                    
+                    hostConnection.on('error', () => {
+                        showToast("Impossibile connettersi alla stanza!");
+                    });
+                });
             }
         }
 
-        function startTableRound() {
-            let lid = document.getElementById('lid');
-            lid.classList.remove('open');
-            lid.style.display = 'flex';
-            lid.classList.add('shaking');
-            document.getElementById('lidTitle').textContent = "Mescolando i dadi...";
-            document.getElementById('countdownNum').style.display = 'none';
-
-            // Genera la griglia mentre il coperchio è già chiuso
-            generateGridFromSeed();
-
-            setTimeout(() => {
-                lid.classList.remove('shaking');
-                document.getElementById('countdownNum').style.display = 'block';
-                document.getElementById('lidTitle').textContent = "La partita inizia tra:";
-                let count = 3;
-                document.getElementById('countdownNum').textContent = count;
-
-                let cInterval = setInterval(() => {
-                    count--;
-                    if (count > 0) {
-                        document.getElementById('countdownNum').textContent = count;
-                    } else {
-                        clearInterval(cInterval);
-                        lid.classList.add('open');
-                        
-                        targetEndTime = Date.now() + (config.totalSeconds * 1000);
-                        saveToLocalStorage('game', targetEndTime);
-                        startTimerWithTarget(targetEndTime);
-                    }
-                }, 1000);
-            }, 1200);
+        // --- COMUNICAZIONE HOST -> GUEST & GUEST -> HOST ---
+        function handleHostIncomingData(data, conn) {
+            if (data.type === 'JOIN') {
+                conn.playerName = data.name;
+                leaderboard[data.name] = 0;
+            } else if (data.type === 'SUBMIT_SCORE') {
+                leaderboard[data.name] = data.score;
+                // Invia la classifica aggiornata a tutti
+                broadcastToGuests({ type: 'UPDATE_LEADERBOARD', leaderboard: leaderboard });
+            }
         }
 
-        function startCountdownAndPlay() {
+        function handleGuestIncomingData(data) {
+            if (data.type === 'START_GAME') {
+                config = data.config;
+                targetEndTime = data.targetEndTime;
+                currentLetters = data.letters;
+                enterGameAreaFromRemote();
+            } else if (data.type === 'PAUSE_GAME') {
+                triggerRemotePause(data.isPaused);
+            } else if (data.type === 'UPDATE_LEADERBOARD') {
+                leaderboard = data.leaderboard;
+                showLeaderboardModal();
+            }
+        }
+
+        function broadcastToGuests(packet) {
+            guestConnections.forEach(conn => conn.send(packet));
+        }
+
+        // --- AVVIO PARTITA ---
+        function hostStartMatch() {
+            targetEndTime = Date.now() + (config.totalSeconds * 1000);
+            
+            // Genera lettere univoche basate sul codice stanza
+            let seed = pseudorandomFromSeed(roomCode);
+            let totalCells = config.size * config.size;
+            let shuffledDice = [...realDiceItalian].sort(() => seed() - 0.5).slice(0, totalCells);
+            currentLetters = shuffledDice.map(die => die[Math.floor(seed() * die.length)]).sort(() => seed() - 0.5);
+
+            // Invia pacchetto di avvio a tutti i guest
+            broadcastToGuests({
+                type: 'START_GAME',
+                config: config,
+                targetEndTime: targetEndTime,
+                letters: currentLetters
+            });
+
+            enterGameAreaFromRemote();
+        }
+
+        function enterGameAreaFromRemote() {
             document.getElementById('lobbyPanel').style.display = 'none';
             document.getElementById('gameArea').style.display = 'flex';
             document.getElementById('digitalNotepad').style.display = 'block';
@@ -890,41 +873,32 @@
                 document.getElementById('hostPauseBtn').style.display = 'none';
             }
 
-            startRound();
+            startRoundDirect(targetEndTime);
         }
 
-        function generateGridFromSeed() {
-            let seed = pseudorandomFromSeed(roomCode);
-            let totalCells = config.size * config.size;
-            let diceGrid = document.getElementById('diceGrid');
-            diceGrid.className = `grid grid-${config.size}`;
-            diceGrid.innerHTML = '';
-
-            let shuffledDice = [...realDiceItalian].sort(() => seed() - 0.5).slice(0, totalCells);
-            currentLetters = shuffledDice.map(die => die[Math.floor(seed() * die.length)]).sort(() => seed() - 0.5);
-
-            for (let i = 0; i < totalCells; i++) {
-                let cell = document.createElement('div');
-                cell.className = 'dice';
-                cell.textContent = currentLetters[i];
-                diceGrid.appendChild(cell);
-            }
-        }
-
-        function startRound() {
+        function startRoundDirect(endTimestamp) {
             myWords = [];
             renderWordList();
             document.getElementById('wordInput').disabled = false;
 
-            // Assicura che il coperchio rimanga aperto durante la modalità multi-telefono regolare
             let lid = document.getElementById('lid');
             lid.classList.add('open');
 
-            generateGridFromSeed();
-            
-            targetEndTime = Date.now() + (config.totalSeconds * 1000);
-            saveToLocalStorage('game', targetEndTime);
-            startTimerWithTarget(targetEndTime);
+            renderGridFromLetters(currentLetters);
+            startTimerWithTarget(endTimestamp);
+        }
+
+        function renderGridFromLetters(letters) {
+            let diceGrid = document.getElementById('diceGrid');
+            diceGrid.className = `grid grid-${config.size}`;
+            diceGrid.innerHTML = '';
+
+            for (let i = 0; i < letters.length; i++) {
+                let cell = document.createElement('div');
+                cell.className = 'dice';
+                cell.textContent = letters[i];
+                diceGrid.appendChild(cell);
+            }
         }
 
         function startTimerWithTarget(endTimestamp) {
@@ -941,19 +915,12 @@
 
                     if (timeLeft <= 0) {
                         clearInterval(timerInterval);
-                        localStorage.removeItem('paroliere_state');
                         endRound();
                     }
                 } else {
                     targetEndTime += 1000;
                 }
             }, 1000);
-        }
-
-        function rotateGrid() {
-            currentRotation = (currentRotation + 90) % 360;
-            document.getElementById('gridWrapper').style.transform = `rotate(${currentRotation}deg)`;
-            document.getElementById('reviewDiceGrid').parentElement.style.transform = `rotate(${currentRotation}deg)`;
         }
 
         function pseudorandomFromSeed(str) {
@@ -984,7 +951,6 @@
                     triggerVibration(40);
                     playAudioTone(800, 0.08);
                     renderWordList();
-                    saveToLocalStorage('game', targetEndTime);
                 }
             }
             input.value = '';
@@ -1012,8 +978,24 @@
         function togglePause() {
             if (deviceMode === 'multi' && role !== 'host') return;
             isPaused = !isPaused;
+
+            broadcastToGuests({ type: 'PAUSE_GAME', isPaused: isPaused });
+            triggerRemotePause(isPaused);
+            document.getElementById('wordInput').disabled = isPaused;
+        }
+
+        function triggerRemotePause(pauseState) {
+            isPaused = pauseState;
             document.getElementById('pauseOverlay').style.display = isPaused ? 'flex' : 'none';
-            if (deviceMode === 'multi') document.getElementById('wordInput').disabled = isPaused;
+            if (role === 'host') {
+                document.getElementById('resumeMatchBtn').style.display = 'inline-block';
+                document.getElementById('terminateMatchBtn').style.display = 'inline-block';
+                document.getElementById('guestPauseMsg').style.display = 'none';
+            } else {
+                document.getElementById('resumeMatchBtn').style.display = 'none';
+                document.getElementById('terminateMatchBtn').style.display = 'none';
+                document.getElementById('guestPauseMsg').style.display = 'block';
+            }
         }
 
         function endRound() {
@@ -1033,40 +1015,11 @@
             }
 
             if (deviceMode === 'single') {
-                document.getElementById('reviewSubtitle').textContent = "Tempo Scaduto! Verificate le parole sui vostri fogli e inserite i punti:";
-                document.getElementById('multiReviewSection').style.display = 'none';
-                document.getElementById('singleReviewSection').style.display = 'block';
-
-                let tbody = document.getElementById('singleScoreInputsBody');
-                tbody.innerHTML = '';
-                Object.keys(leaderboard).forEach((player, idx) => {
-                    let tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td><b>${player}</b></td>
-                        <td style="text-align:center;">
-                            <input type="number" class="manual-score-input" data-player="${player}" value="0" min="0">
-                        </td>
-                    `;
-                    tbody.appendChild(tr);
-                });
+                document.getElementById('reviewSubtitle').textContent = "Tempo Scaduto! Verificate i punti sui fogli:";
+                // (Logica single player già gestita)
             } else {
-                document.getElementById('reviewSubtitle').innerHTML = "Verifica le parole sulla griglia.<br>1 Tap = <b>Mezzo Punteggio</b> | 2 Tap = <b>Annullata</b>";
-                document.getElementById('multiReviewSection').style.display = 'block';
-                document.getElementById('singleReviewSection').style.display = 'none';
                 renderReviewList();
             }
-        }
-
-        function saveSingleRoundScores() {
-            const inputs = document.querySelectorAll('.manual-score-input');
-            inputs.forEach(input => {
-                let p = input.getAttribute('data-player');
-                let val = parseFloat(input.value) || 0;
-                leaderboard[p] += val;
-            });
-
-            document.getElementById('reviewModal').style.display = 'none';
-            showLeaderboard();
         }
 
         function renderReviewList() {
@@ -1077,55 +1030,50 @@
             myWords.forEach((item, index) => {
                 let badge = document.createElement('div');
                 badge.className = `word-badge ${item.state}`;
-                
                 let basePoints = getBasePoints(item.word);
-                let currentPoints = basePoints;
-
-                if (item.state === 'half') currentPoints = basePoints / 2;
-                if (item.state === 'deleted') currentPoints = 0;
-
+                let currentPoints = item.state === 'half' ? basePoints / 2 : (item.state === 'deleted' ? 0 : basePoints);
                 totalRoundScore += currentPoints;
 
                 badge.textContent = `${item.word} (${currentPoints} ptn)`;
-                badge.onclick = () => toggleWordState(index);
+                badge.onclick = () => {
+                    let states = ['full', 'half', 'deleted'];
+                    item.state = states[(states.indexOf(item.state) + 1) % states.length];
+                    renderReviewList();
+                };
                 container.appendChild(badge);
             });
 
             document.getElementById('roundScoreDisplay').textContent = totalRoundScore;
         }
 
-        function toggleWordState(index) {
-            triggerVibration(30);
-            let states = ['full', 'half', 'deleted'];
-            let nextIndex = (states.indexOf(myWords[index].state) + 1) % states.length;
-            myWords[index].state = states[nextIndex];
-            renderReviewList();
-        }
-
         function getBasePoints(w) {
-            if (config.scoringMode === 'perLetter') {
-                return w.length;
-            } else if (config.scoringMode === 'perWord') {
-                return 1;
-            } else {
-                let len = w.length;
-                if (len <= 4) return 1;
-                if (len === 5) return 2;
-                if (len === 6) return 3;
-                if (len === 7) return 5;
-                return 11;
-            }
+            if (config.scoringMode === 'perLetter') return w.length;
+            if (config.scoringMode === 'perWord') return 1;
+            let len = w.length;
+            if (len <= 4) return 1;
+            if (len === 5) return 2;
+            if (len === 6) return 3;
+            if (len === 7) return 5;
+            return 11;
         }
 
         function confirmRoundScore() {
             let roundPoints = parseFloat(document.getElementById('roundScoreDisplay').textContent);
-            leaderboard[myName] += roundPoints;
+            leaderboard[myName] = (leaderboard[myName] || 0) + roundPoints;
 
             document.getElementById('reviewModal').style.display = 'none';
-            showLeaderboard();
+
+            if (role === 'host') {
+                showLeaderboardModal();
+                broadcastToGuests({ type: 'UPDATE_LEADERBOARD', leaderboard: leaderboard });
+            } else {
+                // Invia il punteggio aggiornato all'Host
+                hostConnection.send({ type: 'SUBMIT_SCORE', name: myName, score: leaderboard[myName] });
+                showToast("Punteggio inviato all'Host!");
+            }
         }
 
-        function showLeaderboard() {
+        function showLeaderboardModal() {
             let tbody = document.getElementById('leaderboardBody');
             tbody.innerHTML = '';
 
@@ -1137,92 +1085,55 @@
             });
 
             document.getElementById('leaderboardModal').style.display = 'flex';
-            saveToLocalStorage('leaderboard', targetEndTime);
+            if (role === 'host') {
+                document.getElementById('nextRoundBtn').style.display = 'block';
+            }
         }
 
-        function returnToLobbyNextRound() {
+        function hostNextRound() {
             document.getElementById('leaderboardModal').style.display = 'none';
             document.getElementById('gameArea').style.display = 'none';
-
-            if (deviceMode === 'single') {
-                roomCode = generateSeedCode();
-                document.getElementById('gameArea').style.display = 'flex';
-                startTableRound();
-            } else {
-                document.getElementById('lobbyPanel').style.display = 'block';
-                saveToLocalStorage('lobby', 0);
-            }
+            document.getElementById('lobbyPanel').style.display = 'block';
         }
 
         function resetAll() {
-            localStorage.removeItem('paroliere_state');
             location.href = window.location.pathname;
         }
 
-        function saveToLocalStorage(step, endTimestamp) {
-            const state = {
-                step: step,
-                deviceMode: deviceMode,
-                role: role,
-                config: config,
-                myName: myName,
-                roomCode: roomCode,
-                myWords: myWords,
-                leaderboard: leaderboard,
-                targetEndTime: endTimestamp || (Date.now() + (config.totalSeconds * 1000))
-            };
-            localStorage.setItem('paroliere_state', JSON.stringify(state));
-        }
+        // Funzione per la modalità singolo giocatore con carta
+        function startTableRound() {
+            let lid = document.getElementById('lid');
+            lid.classList.remove('open');
+            lid.style.display = 'flex';
+            lid.classList.add('shaking');
+            document.getElementById('lidTitle').textContent = "Mescolando i dadi...";
+            document.getElementById('countdownNum').style.display = 'none';
 
-        function loadFromLocalStorage() {
-            const saved = localStorage.getItem('paroliere_state');
-            if (!saved) return;
+            let seed = Math.random();
+            let totalCells = config.size * config.size;
+            let shuffledDice = [...realDiceItalian].sort(() => seed - 0.5).slice(0, totalCells);
+            currentLetters = shuffledDice.map(die => die[Math.floor(Math.random() * die.length)]);
+            renderGridFromLetters(currentLetters);
 
-            try {
-                const state = JSON.parse(saved);
-                if (!state.roomCode) return;
+            setTimeout(() => {
+                lid.classList.remove('shaking');
+                document.getElementById('countdownNum').style.display = 'block';
+                document.getElementById('lidTitle').textContent = "La partita inizia tra:";
+                let count = 3;
+                document.getElementById('countdownNum').textContent = count;
 
-                deviceMode = state.deviceMode || 'multi';
-                role = state.role || 'host';
-                config = state.config || config;
-                myName = state.myName || 'Giocatore';
-                roomCode = state.roomCode || '';
-                myWords = state.myWords || [];
-                leaderboard = state.leaderboard || {};
-                targetEndTime = state.targetEndTime || (Date.now() + 180000);
-
-                if (state.step === 'lobby') {
-                    document.getElementById('setupPanel').style.display = 'none';
-                    document.getElementById('lobbyPanel').style.display = 'block';
-                    document.getElementById('codeDisplay').textContent = roomCode;
-                    if (role === 'host') {
-                        document.getElementById('hostLobbyNotice').style.display = 'block';
-                        document.getElementById('startMatchBtn').style.display = 'block';
+                let cInterval = setInterval(() => {
+                    count--;
+                    if (count > 0) {
+                        document.getElementById('countdownNum').textContent = count;
                     } else {
-                        document.getElementById('guestLobbyNotice').style.display = 'block';
-                        document.getElementById('guestReadyBtn').style.display = 'block';
+                        clearInterval(cInterval);
+                        lid.classList.add('open');
+                        targetEndTime = Date.now() + (config.totalSeconds * 1000);
+                        startTimerWithTarget(targetEndTime);
                     }
-                } else if (state.step === 'game') {
-                    document.getElementById('setupPanel').style.display = 'none';
-                    document.getElementById('gameArea').style.display = 'flex';
-                    
-                    if (deviceMode === 'single') {
-                        document.getElementById('digitalNotepad').style.display = 'none';
-                        document.getElementById('rotateBtn').style.display = 'inline-block';
-                        document.getElementById('hostPauseBtn').style.display = 'inline-block';
-                    } else {
-                        document.getElementById('digitalNotepad').style.display = 'block';
-                        document.getElementById('rotateBtn').style.display = 'none';
-                        if (role === 'host') document.getElementById('hostPauseBtn').style.display = 'inline-block';
-                    }
-
-                    renderWordList();
-                    generateGridFromSeed();
-                    startTimerWithTarget(targetEndTime);
-                }
-            } catch (e) {
-                console.error("Errore ripristino stato", e);
-            }
+                }, 1000);
+            }, 1200);
         }
     </script>
 </body>
