@@ -817,7 +817,7 @@
                 let totalExpected = guestConnections.length + 1;
                 let totalConfirmed = Object.keys(confirmedPlayers).length;
 
-                // Propaga lo stato delle conferme a tutti, ma SENZA forzare la chiusura delle schermate altrui
+                // Propaga i dati della classifica a tutti i client
                 broadcastToGuests({ 
                     type: 'UPDATE_LEADERBOARD', 
                     leaderboard: leaderboard, 
@@ -826,8 +826,10 @@
                     totalExpected: totalExpected 
                 });
                 
-                // Aggiorna la classifica visibile sul dispositivo dell'host in modo indipendente
-                updateLeaderboardUILocally(leaderboard, totalConfirmed, totalExpected);
+                // Aggiorna l'interfaccia dell'Host solo se l'Host ha già inviato il proprio punteggio
+                if (confirmedPlayers[myName]) {
+                    updateLeaderboardUILocally(leaderboard, totalConfirmed, totalExpected);
+                }
             }
         }
 
@@ -855,8 +857,7 @@
                 let totalExpected = guestConnections.length + 1;
                 let totalConfirmed = Object.keys(confirmedPlayers).length;
                 
-                // Aggiorna la tabella delle conferme in tempo reale per tutti, 
-                // ma NON chiude la modale di revisione del giocatore se lui non ha ancora premuto Conferma!
+                // L'aggiornamento della modale della classifica avviene SOLO se il giocatore ha già completato la propria revisione
                 if (document.getElementById('leaderboardModal').style.display === 'flex') {
                     updateLeaderboardUILocally(leaderboard, totalConfirmed, totalExpected);
                 }
@@ -953,7 +954,7 @@
                         }
                     }, 1000);
                 }
-            }, 20); // Controllo ultra-rapido a 20ms per sincronizzare l'apertura del coperchio al millisecondo
+            }, 20);
         }
 
         function renderGridFromLetters(letters) {
@@ -1144,7 +1145,6 @@
             leaderboard[myName] = (leaderboard[myName] || 0) + roundPoints;
             confirmedPlayers[myName] = true;
 
-            // Disabilita il pulsante e chiude la revisione SOLO per chi ha cliccato
             document.getElementById('confirmScoreBtn').disabled = true;
             document.getElementById('reviewModal').style.display = 'none';
 
@@ -1162,7 +1162,6 @@
                 });
             } else {
                 hostConnection.send({ type: 'SUBMIT_SCORE', name: myName, score: leaderboard[myName] });
-                // Mostra la classifica in modalità di attesa finché l'host non dà il via
                 updateLeaderboardUILocally(leaderboard, totalConfirmed, totalExpected);
             }
         }
