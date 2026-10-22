@@ -2,9 +2,9 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Il Paroliere Multiplayer P2P</title>
-    <!-- Libreria PeerJS per la connessione P2P diretta tra dispositivi -->
+    <!-- PeerJS per P2P diretto -->
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
     <style>
         :root {
@@ -18,6 +18,7 @@
             --warning: #b59f3b;
             --danger: #e74c3c;
             --border: #3a3a3c;
+            --app-height: 100vh;
         }
 
         * {
@@ -32,30 +33,29 @@
         body {
             background-color: var(--bg-color);
             color: var(--text-main);
-            min-height: 100vh;
-            min-height: -webkit-fill-available;
+            height: var(--app-height);
+            width: 100vw;
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 10px;
-            overflow-x: hidden;
+            overflow: hidden;
+            padding: 8px;
         }
-
-        html { height: -webkit-fill-available; }
 
         header {
             text-align: center;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
+            flex-shrink: 0;
         }
 
         h1 {
-            font-size: 1.4rem;
+            font-size: 1.3rem;
             letter-spacing: 1px;
             text-transform: uppercase;
         }
 
         .subtitle {
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             color: var(--text-muted);
         }
 
@@ -66,28 +66,30 @@
             flex-direction: column;
             align-items: center;
             flex: 1;
+            min-height: 0;
         }
 
         .panel {
             background-color: var(--surface-color);
             border: 1px solid var(--border);
             border-radius: 12px;
-            padding: 16px;
+            padding: 14px;
             width: 100%;
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 10px;
             margin-bottom: 10px;
+            overflow-y: auto;
         }
 
         .control-group {
             display: flex;
             flex-direction: column;
-            gap: 5px;
+            gap: 4px;
         }
 
         .control-group label {
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             color: var(--text-muted);
             font-weight: bold;
         }
@@ -113,7 +115,7 @@
 
         .option-btn.active {
             border-color: var(--accent);
-            background-color: rgba(83, 141, 78, 0.15);
+            background-color: rgba(83, 141, 78, 0.2);
         }
 
         .input-text {
@@ -209,12 +211,16 @@
             margin: 8px 0;
         }
 
+        /* STRUTTURA AREA GIOCO A SCROLL PER TASTIERA MOBILE */
         .game-area {
             width: 100%;
+            height: 100%;
             display: flex;
             flex-direction: column;
-            align-items: center;
             display: none;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: 10px;
         }
 
         .hud {
@@ -222,11 +228,12 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
+            flex-shrink: 0;
         }
 
         .timer-display {
-            font-size: 1.6rem;
+            font-size: 1.5rem;
             font-weight: 900;
             color: var(--accent);
             font-variant-numeric: tabular-nums;
@@ -252,22 +259,21 @@
 
         .grid-wrapper {
             position: relative;
-            padding: 8px;
+            padding: 6px;
             background: var(--surface-color);
             border-radius: 12px;
             border: 1px solid var(--border);
             box-shadow: 0 8px 20px rgba(0,0,0,0.4);
             width: 100%;
+            flex-shrink: 0;
             transition: transform 0.4s ease;
             overflow: hidden;
         }
 
         .lid {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
             background-color: #121213 !important;
             border: 2px solid var(--border);
             border-radius: 12px;
@@ -290,10 +296,8 @@
 
         .pause-overlay {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
             background-color: #121213 !important;
             border-radius: 12px;
             display: flex;
@@ -306,7 +310,7 @@
             display: none;
         }
 
-        .grid { display: grid; gap: 6px; }
+        .grid { display: grid; gap: 5px; }
         .grid-5 { grid-template-columns: repeat(5, 1fr); }
         .grid-6 { grid-template-columns: repeat(6, 1fr); }
 
@@ -328,22 +332,30 @@
             border-radius: 4px !important;
         }
 
+        .digital-notepad {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-top: 8px;
+            flex-shrink: 0;
+        }
+
         .word-input-container {
             width: 100%;
             display: flex;
             gap: 6px;
-            margin-top: 10px;
         }
 
         .word-list {
             width: 100%;
-            max-height: 140px;
+            max-height: 120px;
+            min-height: 50px;
             overflow-y: auto;
             background: var(--surface-color);
             border: 1px solid var(--border);
             border-radius: 8px;
-            margin-top: 8px;
-            padding: 8px;
+            padding: 6px;
             display: flex;
             flex-wrap: wrap;
             gap: 6px;
@@ -353,9 +365,9 @@
         .word-badge {
             background: var(--panel-color);
             border: 1px solid var(--border);
-            padding: 6px 10px;
+            padding: 5px 9px;
             border-radius: 14px;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             font-weight: bold;
             touch-action: manipulation;
         }
@@ -527,12 +539,12 @@
                     <h3 style="color: var(--text-main);">PARTITA IN PAUSA</h3>
                     <button id="resumeMatchBtn" class="btn-primary" style="width:100%; padding: 12px; display:none;" onclick="togglePause()">RIPRENDI GIOCO</button>
                     <p id="guestPauseMsg" style="font-size:0.85rem; color: var(--text-muted);">L'Host ha messo in pausa la partita.</p>
-                    <button class="btn-secondary btn-danger" id="terminateMatchBtn" style="width:100%; padding: 12px; display:none;" onclick="resetAll()">🗑️ Termina Partita</button>
+                    <button class="btn-secondary btn-danger" id="terminateMatchBtn" style="width:100%; padding: 12px; display:none;" onclick="terminateMatchForAll()">🗑️ Termina Partita</button>
                 </div>
                 <div id="diceGrid" class="grid grid-5"></div>
             </div>
 
-            <div id="digitalNotepad" style="width: 100%;">
+            <div id="digitalNotepad" class="digital-notepad">
                 <div class="word-input-container">
                     <input type="text" id="wordInput" class="input-text" placeholder="Scrivi parola..." autocomplete="off">
                     <button class="btn-primary" style="width: auto; padding: 0 16px;" onclick="addWord()">+ Add</button>
@@ -582,7 +594,7 @@
             </table>
 
             <button id="nextRoundBtn" class="btn-primary" style="margin-bottom: 8px; display:none;" onclick="hostNextRound()">PROSSIMO ROUND 🔄</button>
-            <button class="btn-secondary btn-danger" onclick="resetAll()">Esci dalla Stanza</button>
+            <button class="btn-secondary btn-danger" onclick="terminateMatchForAll()">Esci / Termina Stanza</button>
         </div>
     </div>
 
@@ -617,18 +629,45 @@
         let currentLetters = [];
         let targetEndTime = 0;
 
-        // Variabili PeerJS P2P
+        // PeerJS P2P
         let peer = null;
-        let hostConnection = null; // Usato se sei Guest per parlare con l'Host
-        let guestConnections = []; // Usato se sei Host per parlare con tutti i Guest
+        let hostConnection = null;
+        let guestConnections = [];
+
+        // GESTIONE DINAMICA ALTEZZA PER TASTIERA MOBILE
+        function updateAppHeight() {
+            if (window.visualViewport) {
+                document.documentElement.style.setProperty('--app-height', `${window.visualViewport.height}px`);
+            } else {
+                document.documentElement.style.setProperty('--app-height', `${window.innerHeight}px`);
+            }
+        }
+
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', updateAppHeight);
+            window.visualViewport.addEventListener('scroll', updateAppHeight);
+        } else {
+            window.addEventListener('resize', updateAppHeight);
+        }
 
         window.addEventListener('DOMContentLoaded', () => {
+            updateAppHeight();
             const urlParams = new URLSearchParams(window.location.search);
             const roomParam = urlParams.get('room');
             if (roomParam) {
                 setRole('guest', document.getElementById('guestRoleBtn'));
                 document.getElementById('roomCodeInput').value = roomParam.toUpperCase();
             }
+
+            // Mantiene il campo di testo ben visibile quando si apre la tastiera
+            const wordInput = document.getElementById('wordInput');
+            wordInput.addEventListener('focus', () => {
+                setTimeout(() => {
+                    wordInput.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }, 300);
+            });
+
+            loadFromLocalStorage();
         });
 
         document.getElementById('wordInput').addEventListener('keypress', function(e) {
@@ -760,15 +799,11 @@
                 roomCode = generateSeedCode();
                 leaderboard[myName] = 0;
 
-                // Crea il nodo PeerJS con ID = codice stanza
                 peer = new Peer("paroliere_" + roomCode);
                 
                 peer.on('open', (id) => {
-                    document.getElementById('setupPanel').style.display = 'none';
-                    document.getElementById('lobbyPanel').style.display = 'block';
-                    document.getElementById('codeDisplay').textContent = roomCode;
-                    document.getElementById('hostLobbyNotice').style.display = 'block';
-                    document.getElementById('startMatchBtn').style.display = 'block';
+                    saveToLocalStorage('lobby');
+                    showLobbyUI();
                 });
 
                 peer.on('connection', (conn) => {
@@ -776,9 +811,13 @@
                     document.getElementById('connectedCount').textContent = guestConnections.length + 1;
 
                     conn.on('data', (data) => handleHostIncomingData(data, conn));
+                    conn.on('close', () => {
+                        guestConnections = guestConnections.filter(c => c !== conn);
+                        document.getElementById('connectedCount').textContent = guestConnections.length + 1;
+                    });
                 });
 
-                peer.on('error', (err) => {
+                peer.on('error', () => {
                     showToast("Errore Stanza: Codice già in uso o rete assente");
                 });
 
@@ -786,38 +825,51 @@
                 roomCode = document.getElementById('roomCodeInput').value.trim().toUpperCase();
                 if (!roomCode) { showToast("Inserisci un codice valido!"); return; }
 
-                peer = new Peer(); // Peer ospite casuale
+                peer = new Peer();
 
                 peer.on('open', (id) => {
-                    hostConnection = peer.connect("paroliere_" + roomCode);
-
-                    hostConnection.on('open', () => {
-                        document.getElementById('setupPanel').style.display = 'none';
-                        document.getElementById('lobbyPanel').style.display = 'block';
-                        document.getElementById('codeDisplay').textContent = roomCode;
-                        document.getElementById('guestLobbyNotice').style.display = 'block';
-                        
-                        // Registrati presso l'host
-                        hostConnection.send({ type: 'JOIN', name: myName });
-                    });
-
-                    hostConnection.on('data', (data) => handleGuestIncomingData(data));
-                    
-                    hostConnection.on('error', () => {
-                        showToast("Impossibile connettersi alla stanza!");
-                    });
+                    connectToHostAsGuest();
                 });
             }
         }
 
-        // --- COMUNICAZIONE HOST -> GUEST & GUEST -> HOST ---
+        function connectToHostAsGuest() {
+            hostConnection = peer.connect("paroliere_" + roomCode);
+
+            hostConnection.on('open', () => {
+                saveToLocalStorage('lobby');
+                showLobbyUI();
+                document.getElementById('guestLobbyNotice').style.display = 'block';
+                document.getElementById('hostLobbyNotice').style.display = 'none';
+                hostConnection.send({ type: 'JOIN', name: myName });
+            });
+
+            hostConnection.on('data', (data) => handleGuestIncomingData(data));
+            hostConnection.on('close', () => {
+                showToast("Connessione con l'Host persa!");
+                resetAll();
+            });
+            hostConnection.on('error', () => {
+                showToast("Impossibile connettersi alla stanza!");
+            });
+        }
+
+        function showLobbyUI() {
+            document.getElementById('setupPanel').style.display = 'none';
+            document.getElementById('lobbyPanel').style.display = 'block';
+            document.getElementById('codeDisplay').textContent = roomCode;
+            if (role === 'host') {
+                document.getElementById('hostLobbyNotice').style.display = 'block';
+                document.getElementById('startMatchBtn').style.display = 'block';
+            }
+        }
+
         function handleHostIncomingData(data, conn) {
             if (data.type === 'JOIN') {
                 conn.playerName = data.name;
                 leaderboard[data.name] = 0;
             } else if (data.type === 'SUBMIT_SCORE') {
                 leaderboard[data.name] = data.score;
-                // Invia la classifica aggiornata a tutti
                 broadcastToGuests({ type: 'UPDATE_LEADERBOARD', leaderboard: leaderboard });
             }
         }
@@ -827,12 +879,16 @@
                 config = data.config;
                 targetEndTime = data.targetEndTime;
                 currentLetters = data.letters;
+                saveToLocalStorage('game');
                 enterGameAreaFromRemote();
             } else if (data.type === 'PAUSE_GAME') {
                 triggerRemotePause(data.isPaused);
             } else if (data.type === 'UPDATE_LEADERBOARD') {
                 leaderboard = data.leaderboard;
                 showLeaderboardModal();
+            } else if (data.type === 'TERMINATE_ROOM') {
+                showToast("L'Host ha terminato la partita.");
+                resetAll();
             }
         }
 
@@ -840,17 +896,21 @@
             guestConnections.forEach(conn => conn.send(packet));
         }
 
-        // --- AVVIO PARTITA ---
+        function terminateMatchForAll() {
+            if (role === 'host') {
+                broadcastToGuests({ type: 'TERMINATE_ROOM' });
+            }
+            resetAll();
+        }
+
         function hostStartMatch() {
             targetEndTime = Date.now() + (config.totalSeconds * 1000);
             
-            // Genera lettere univoche basate sul codice stanza
             let seed = pseudorandomFromSeed(roomCode);
             let totalCells = config.size * config.size;
-            let shuffledDice = [...realDiceItalian].sort(() => seed() - 0.5).slice(0, totalCells);
-            currentLetters = shuffledDice.map(die => die[Math.floor(seed() * die.length)]).sort(() => seed() - 0.5);
+            let shuffledDice = [...realDiceItalian].sort(() => seed - 0.5).slice(0, totalCells);
+            currentLetters = shuffledDice.map(die => die[Math.floor(seed * die.length)]).sort(() => seed - 0.5);
 
-            // Invia pacchetto di avvio a tutti i guest
             broadcastToGuests({
                 type: 'START_GAME',
                 config: config,
@@ -858,13 +918,14 @@
                 letters: currentLetters
             });
 
+            saveToLocalStorage('game');
             enterGameAreaFromRemote();
         }
 
         function enterGameAreaFromRemote() {
             document.getElementById('lobbyPanel').style.display = 'none';
             document.getElementById('gameArea').style.display = 'flex';
-            document.getElementById('digitalNotepad').style.display = 'block';
+            document.getElementById('digitalNotepad').style.display = 'flex';
             document.getElementById('rotateBtn').style.display = 'none';
 
             if (role === 'host') {
@@ -1014,10 +1075,7 @@
                 reviewGrid.appendChild(cell);
             }
 
-            if (deviceMode === 'single') {
-                document.getElementById('reviewSubtitle').textContent = "Tempo Scaduto! Verificate i punti sui fogli:";
-                // (Logica single player già gestita)
-            } else {
+            if (deviceMode !== 'single') {
                 renderReviewList();
             }
         }
@@ -1067,7 +1125,6 @@
                 showLeaderboardModal();
                 broadcastToGuests({ type: 'UPDATE_LEADERBOARD', leaderboard: leaderboard });
             } else {
-                // Invia il punteggio aggiornato all'Host
                 hostConnection.send({ type: 'SUBMIT_SCORE', name: myName, score: leaderboard[myName] });
                 showToast("Punteggio inviato all'Host!");
             }
@@ -1094,13 +1151,54 @@
             document.getElementById('leaderboardModal').style.display = 'none';
             document.getElementById('gameArea').style.display = 'none';
             document.getElementById('lobbyPanel').style.display = 'block';
+            saveToLocalStorage('lobby');
         }
 
         function resetAll() {
+            localStorage.removeItem('paroliere_session');
             location.href = window.location.pathname;
         }
 
-        // Funzione per la modalità singolo giocatore con carta
+        function saveToLocalStorage(step) {
+            const state = {
+                step: step,
+                role: role,
+                roomCode: roomCode,
+                myName: myName,
+                config: config,
+                targetEndTime: targetEndTime,
+                currentLetters: currentLetters,
+                leaderboard: leaderboard
+            };
+            localStorage.setItem('paroliere_session', JSON.stringify(state));
+        }
+
+        function loadFromLocalStorage() {
+            const saved = localStorage.getItem('paroliere_session');
+            if (!saved) return;
+
+            try {
+                const state = JSON.parse(saved);
+                if (!state.roomCode) return;
+
+                role = state.role || 'host';
+                roomCode = state.roomCode;
+                myName = state.myName || 'Giocatore';
+                config = state.config || config;
+                targetEndTime = state.targetEndTime || 0;
+                currentLetters = state.currentLetters || [];
+                leaderboard = state.leaderboard || {};
+
+                if (role === 'guest') {
+                    document.getElementById('setupPanel').style.display = 'none';
+                    peer = new Peer();
+                    peer.on('open', () => {
+                        connectToHostAsGuest();
+                    });
+                }
+            } catch(e) {}
+        }
+
         function startTableRound() {
             let lid = document.getElementById('lid');
             lid.classList.remove('open');
