@@ -3,7 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Il Paroliere Multiplayer P2P</title>
+    
+    <!-- Tag SEO per l'indicizzazione su Google -->
+    <title>Il Paroliere Online - Gioco da Tavolo Multiplayer P2P</title>
+    <meta name="description" content="Gioca a Il Paroliere gratis online con i tuoi amici. Griglia di dadi in tempo reale, timer e punteggi sincronizzati in P2P senza installazione.">
+    <meta name="keywords" content="il paroliere, paroliere online, gioco parole dadi, boggle italiano, paroliere multiplayer, gioco da tavolo online">
+    <meta name="robots" content="index, follow">
+    
+    <!-- Meta Tag per Web App Smartphone -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#121213">
+
     <!-- PeerJS per P2P diretto -->
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
     <style>
@@ -581,7 +592,6 @@
         let timerInterval = null;
         let timeLeft = 0;
         let isPaused = false;
-        let pauseStartTime = 0; // Traccia l'inizio della pausa
         let currentLetters = [];
         let targetEndTime = 0;
         let startTime = 0;
@@ -836,23 +846,13 @@
             } else if (data.type === 'START_GAME') {
                 config = data.config;
                 startTime = data.startTime;
-                targetEndTime = data.targetEndTime;
                 currentLetters = data.letters;
                 roundCounter = data.roundCounter || 1;
                 confirmedPlayers = {};
-                isPaused = false;
                 saveToLocalStorage('game');
                 enterGameAreaFromRemote();
             } else if (data.type === 'PAUSE_GAME') {
-                isPaused = data.isPaused;
-                if (isPaused) {
-                    pauseStartTime = getCorrectedNow();
-                } else {
-                    // Quando riprende, sposta in avanti il targetEndTime del tempo esatto in cui è rimasto in pausa
-                    let pauseDuration = getCorrectedNow() - pauseStartTime;
-                    targetEndTime += pauseDuration;
-                }
-                triggerRemotePause(isPaused);
+                triggerRemotePause(data.isPaused);
             } else if (data.type === 'UPDATE_LEADERBOARD') {
                 leaderboard = data.leaderboard;
                 confirmedPlayers = data.confirmedPlayers || confirmedPlayers;
@@ -883,11 +883,9 @@
         function hostStartMatch() {
             roundCounter++;
             confirmedPlayers = {};
-            isPaused = false;
             
             const now = Date.now();
             startTime = now + 3000;
-            targetEndTime = startTime + (config.totalSeconds * 1000);
             
             let seed = pseudorandomFromSeed(roomCode + "_" + roundCounter);
             let totalCells = config.size * config.size;
@@ -898,7 +896,6 @@
                 type: 'START_GAME',
                 config: config,
                 startTime: startTime,
-                targetEndTime: targetEndTime,
                 letters: currentLetters,
                 roundCounter: roundCounter
             });
@@ -954,6 +951,11 @@
                             clearInterval(cInterval);
                             lid.classList.add('open');
                             renderGridFromLetters(currentLetters);
+                            
+                            // CALCOLA IL TIMER ESATTO SOLO ORA CHE IL COPERCHIO SI APRE
+                            targetEndTime = getCorrectedNow() + (config.totalSeconds * 1000);
+                            saveToLocalStorage('game');
+                            
                             startTimerWithTarget(targetEndTime);
                         }
                     }, 1000);
@@ -1055,13 +1057,6 @@
         function togglePause() {
             if (deviceMode === 'multi' && role !== 'host') return;
             isPaused = !isPaused;
-
-            if (isPaused) {
-                pauseStartTime = getCorrectedNow();
-            } else {
-                let pauseDuration = getCorrectedNow() - pauseStartTime;
-                targetEndTime += pauseDuration;
-            }
 
             broadcastToGuests({ type: 'PAUSE_GAME', isPaused: isPaused });
             triggerRemotePause(isPaused);
@@ -1325,9 +1320,11 @@
                     } else {
                         clearInterval(cInterval);
                         lid.classList.add('open');
-                        startTime = Date.now();
-                        targetEndTime = startTime + (config.totalSeconds * 1000);
+                        
+                        // CALCOLA IL TIMER ESATTO SOLO ORA CHE IL COPERCHIO SI APRE
+                        targetEndTime = Date.now() + (config.totalSeconds * 1000);
                         saveToLocalStorage('game');
+                        
                         startTimerWithTarget(targetEndTime);
                     }
                 }, 1000);
